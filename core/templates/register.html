@@ -1,0 +1,48 @@
+<!-- templates/signup.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CryptoGram - Register</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+</head>
+<body>
+    <header>
+        <h1>CryptoGram</h1>
+    </header>
+    <div class="message-container">
+        {% if msg %}
+        <div class="message error">{{ msg }}</div>
+        {% endif %}
+    </div>
+    <div class="container">
+        <div class="card">
+            <a href="{{ url_for('login') }}" class="back-btn" title="Back to Login">
+                <span class="back-arrow">←</span>
+            </a>
+            <h2>Sign Up</h2>
+            <form id="signup-form" class="signup-form" action="{{ url_for('signup') }}" method="post" onsubmit="return validateSignup()">
+                <label class="form-label">Username</label>
+                <input class="form-input" type="text" name="username" id="username" 
+                       placeholder="At least 3 characters" required pattern="[A-Za-z0-9]{3,}">
+                
+                <label class="form-label">Email</label>
+                <input class="form-input" type="email" name="email" id="email" 
+                       placeholder="Enter your email" required>
+                
+                <label class="form-label">Password</label>
+                <input class="form-input" type="password" name="password" id="password" 
+                       placeholder="Enter your password" required>
+                
+                <label class="form-label">Confirm Password</label>
+                <input class="form-input" type="password" name="confirm_password" id="confirm_password" 
+                       placeholder="Confirm your password" required>
+                
+                <input class="form-submit btn" type="submit" value="Create Account">
+            </form>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/signup.js') }}"></script>
+</body>
+</html>
