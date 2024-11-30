@@ -1,0 +1,184 @@
+/* static/css/login.css */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #00b4db 0%, #0083b0 100%);
+    display: flex;
+    flex-direction: column;
+}
+
+header {
+    padding: 1.5rem 0;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+header h1 {
+    color: white;
+    text-align: center;
+    font-size: 2.5rem;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.message-container {
+    width: 100%;
+    max-width: 400px;
+    margin: 1rem auto 0;
+    padding: 0 1rem;
+}
+
+.container {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
+    margin-top: -2rem;
+}
+
+.card {
+    background: linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%);
+    border-radius: 20px;
+    padding: 2.5rem;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    transform: translateY(0);
+    transition: transform 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+}
+
+.card h2 {
+    color: #006064;
+    font-size: 1.8rem;
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+
+.form-label {
+    display: block;
+    color: #00838f;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.form-input {
+    width: 100%;
+    padding: 0.8rem;
+    margin-bottom: 1.2rem;
+    border: 2px solid #80deea;
+    border-radius: 10px;
+    font-size: 1rem;
+    background: rgba(255, 255, 255, 0.9);
+    transition: all 0.3s ease;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: #00acc1;
+    box-shadow: 0 0 0 3px rgba(0, 172, 193, 0.1);
+    background: white;
+}
+
+.btn {
+    width: 100%;
+    padding: 0.8rem;
+    border: none;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.form-submit {
+    background: linear-gradient(135deg, #00acc1 0%, #0097a7 100%);
+    color: white;
+    margin-bottom: 1rem;
+}
+
+.form-submit:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 172, 193, 0.4);
+}
+
+.signup-btn {
+    background: white;
+    color: #00838f;
+    border: 2px solid #80deea;
+}
+
+.signup-btn:hover {
+    background: #e0f7fa;
+}
+
+.google-btn {
+    background: #db4437;
+    color: white;
+}
+
+.google-btn:hover {
+    background: #c53929;
+}
+
+.message {
+    text-align: center;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    border-radius: 10px;
+    font-weight: 500;
+    animation: fadeIn 0.3s ease;
+}
+
+.message.error {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ff8787 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(255, 107, 107, 0.2);
+}
+
+.message.success {
+    background: linear-gradient(135deg, #51cf66 0%, #40c057 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(81, 207, 102, 0.2);
+}
+
+.message.info {
+    background: linear-gradient(135deg, #00acc1 0%, #0097a7 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(0, 172, 193, 0.2);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (max-width: 480px) {
+    .card {
+        padding: 1.5rem;
+    }
+
+    header h1 {
+        font-size: 2rem;
+    }
+    
+    .message-container {
+        padding: 0 1rem;
+    }
+}
