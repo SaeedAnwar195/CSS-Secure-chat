@@ -1,14 +1,15 @@
+<!-- templates/login.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CryptoGram - Login</title>
+    <title>CrptoGram - Login</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
 </head>
 <body>
     <header>
-        <h1>CryptoGram</h1>
+        <h1>CrptoGram</h1>
     </header>
     <div class="message-container">
         {% if msg %}
@@ -23,3 +24,16 @@
                 <input class="form-input" type="text" name="username" id="username" placeholder="Enter your username">
                 <label class="form-label">Password</label>
                 <input class="form-input" type="password" name="password" id="password" placeholder="Enter your password">
+                <input class="form-submit btn" type="submit" value="Login">
+            </form>
+            <form action="{{ url_for('signup') }}" method="get">
+                <input class="form-submit btn signup-btn" type="submit" value="Sign Up">
+            </form>
+            <form action="{{ url_for('google_login') }}" method="get">
+                <input class="form-submit btn google-btn" type="submit" value="Login with Google">
+            </form>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/login.js') }}"></script>
+</body>
+</html>
