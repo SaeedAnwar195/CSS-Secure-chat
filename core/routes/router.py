@@ -172,9 +172,90 @@ def login():
 def index():
     if 'loggedin' not in session:
         return redirect(url_for('cryptogram.login'))
-        
+
     userData = {
         'Username': session['username'],
         'Email': session['email']
     }
     return render_template('index.html', userData=userData)
+
+
+@bp.route('/reset-password', methods=['GET', 'POST'])
+def reset_password_request():
+    app_logger.info("Accessed password reset request route")
+    if request.method == 'POST':
+        email = request.form['email']
+        app_logger.info(
+            f"Processing password reset request for email: {email}")
+
+        try:
+            user = User.query.filter_by(email=email).first()
+            if user:
+                otp = EmailService.send_reset_password_otp(user)
+                user.reset_password_otp = otp
+                user.reset_password_timestamp = datetime.utcnow()
+                db.session.commit()
+
+                session['reset_email'] = email
+                app_logger.info(f"Reset password OTP sent to: {email}")
+                return redirect(url_for('cryptogram.reset_password_verify'))
+            else:
+                app_logger.warning(
+                    f"Reset password requested for non-existent email: {email}")
+                msg = "If this email is registered, you will receive a reset code."
+        except Exception as e:
+            app_logger.error(f"Error in reset password request: {str(e)}")
+            msg = "An error occurred. Please try again later."
+
+        return render_template('reset_password_request.html', msg=msg)
+
+    return render_template('reset_password_request.html')
+
+
+@bp.route('/reset-password/verify', methods=['GET', 'POST'])
+def reset_password_verify():
+    app_logger.info("Accessed reset password verification route")
+    if 'reset_email' not in session:
+        app_logger.warning("No reset email in session")
+        return redirect(url_for('cryptogram.reset_password_request'))
+
+    if request.method == 'POST':
+        app_logger.info("Processing reset password verification")
+        otp = request.form['otp']
+        password = request.form['password']
+        confirm_password = request.form['confirm_password']
+
+        if password != confirm_password:
+            app_logger.warning("Password mismatch in reset verification")
+            return render_template('reset_password_verify.html', msg="Passwords do not match")
+
+        try:
+            user = User.query.filter_by(email=session['reset_email']).first()
+            if not user:
+                app_logger.error(
+                    f"User not found for reset email: {session['reset_email']}")
+                return redirect(url_for('cryptogram.reset_password_request'))
+
+            if user.reset_password_otp != otp:
+                app_logger.warning("Invalid OTP entered for password reset")
+                return render_template('reset_password_verify.html', msg="Invalid verification code")
+
+            if datetime.utcnow() - user.reset_password_timestamp > timedelta(minutes=10):
+                app_logger.warning("Expired OTP used for password reset")
+                return render_template('reset_password_verify.html', msg="Verification code has expired")
+
+            user.set_password(password)
+            user.reset_password_otp = None
+            user.reset_password_timestamp = None
+            db.session.commit()
+
+            session.pop('reset_email', None)
+            app_logger.info(
+                f"Password reset successful for user: {user.username}")
+            return redirect(url_for('cryptogram.login', msg="Password reset successful. Please login with your new password."))
+
+        except Exception as e:
+            app_logger.error(f"Error in reset password verification: {str(e)}")
+            return render_template('reset_password_verify.html', msg="An error occurred. Please try again.")
+
+    return render_template('reset_password_verify.html')
