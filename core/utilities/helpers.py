@@ -1,30 +1,59 @@
-import random
-from datetime import datetime
 from flask import current_app
 from flask_mail import Message
+import random
+from datetime import datetime
+from core import mail
 
 class EmailService:
     @staticmethod
-    def generate_otp():
-        return ''.join([str(random.randint(0, 9)) for _ in range(6)])
-
-    @staticmethod
     def send_otp_email(user):
-        otp = EmailService.generate_otp()
-        user.otp = otp
-        user.otp_timestamp = datetime.utcnow()
+        try:
+            otp = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+            user.otp = otp
+            user.otp_timestamp = datetime.utcnow()
 
+            msg = Message(
+                'Your Cryptogram Verification Code',
+                sender=current_app.config['MAIL_USERNAME'],
+                recipients=[user.email]
+            )
+            msg.body = f"""
+            Welcome to Cryptogram!
+
+            Your verification code is: {otp}
+
+            This code will expire in 10 minutes.
+
+            If you didn't request this code, please ignore this email.
+            """
+            mail.send(msg)
+            return otp
+        
+            
+        except Exception as e:
+            current_app.logger.error(f"Failed to send OTP email: {str(e)}")
+            raise
+    
+    @staticmethod
+    def send_reset_password_otp(user):
+        otp = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+        
         msg = Message(
-            'Your Cryptogram Verification Code',
+            'Password Reset Request - Cryptogram',
             sender=current_app.config['MAIL_USERNAME'],
             recipients=[user.email]
         )
         msg.body = f"""
-        Welcome to Cryptogram!
-        Your verification code is: {otp}
-        This code will expire in 10 minutes.
-        """
-        current_app.mail.send(msg)
+            Hello {user.username},
+
+            We received a request to reset your Cryptogram account password.
+            Your password reset code is: {otp}
+
+            This code will expire in 10 minutes.
+
+            If you didn't request this code, please ignore this email.
+            """
+        mail.send(msg)
         return otp
 
 
