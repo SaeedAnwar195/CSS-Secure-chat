@@ -158,6 +158,23 @@ header h1 {
     box-shadow: 0 4px 15px rgba(0, 172, 193, 0.2);
 }
 
+.forgot-password {
+    text-align: right;
+    margin-bottom: 15px;
+}
+
+.forgot-password a {
+    color: #00838f;
+    text-decoration: none;
+    font-size: 0.9em;
+    transition: color 0.3s ease;
+}
+
+.forgot-password a:hover {
+    color: #006064;
+    text-decoration: underline;
+}
+
 @keyframes fadeIn {
     from {
         opacity: 0;

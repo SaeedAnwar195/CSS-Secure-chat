@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CrptoGram - Verfiy Otp</title>
+    <title>CryptoGram - Verfiy Otp</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
 </head>
 <body>
     <header>
-        <h1>CrptoGram</h1>
+        <h1>CryptoGram</h1>
     </header>
     <div class="message-container">
         {% if msg %}
@@ -17,14 +17,14 @@
     </div>
     <div class="container">
         <div class="card">
-            <h2>Login</h2>
+            <h2>Verify Otp</h2>
             <form id="login-form" class="login-form" action="{{ url_for('cryptogram.verify_otp') }}" method="post">
                 <label class="form-label">OneTimePassword</label>
-                <input class="form-input" type="text" name="username" id="otp" placeholder="Enter your OTP">
-                <input class="form-submit btn" type="submit" value="Login">
+                <input class="form-input" type="text" name="otp" id="otp" placeholder="Enter your OTP">
+                <input class="form-submit btn" type="submit" value="Verify Otp">
             </form>
             <form action="{{ url_for('cryptogram.login') }}" method="get">
-                <input class="form-submit btn signup-btn" type="submit" value="Sign Up">
+                <input class="form-submit btn signup-btn" type="submit" value=" Back To Sign Up">
             </form>
         </div>
     </div>
