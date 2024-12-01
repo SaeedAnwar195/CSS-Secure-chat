@@ -1,7 +1,6 @@
 import os
 import logging
 from logging.handlers import RotatingFileHandler
-from datetime import datetime
 
 class Logger:
     def __init__(self, app_name='Cryptogram'):
@@ -34,14 +33,8 @@ class Logger:
         file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(formatter)
 
-        # Setup console handler
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
-        console_handler.setFormatter(formatter)
-
-        # Add handlers to logger
+        # Add file handler to logger
         self.logger.addHandler(file_handler)
-        self.logger.addHandler(console_handler)
 
     def get_logger(self):
         return self.logger
