@@ -11,7 +11,7 @@ from core.logger import app_logger
 
 # Initialize extensions
 socketio = SocketIO(async_mode='gevent', cors_allowed_origins="*")
-mail = Mail()
+mail = Mail()  # This will be exported and used by other modules
 bcrypt = Bcrypt()
 
 def create_app(test_config=None):
@@ -31,7 +31,7 @@ def create_app(test_config=None):
         # Initialize extensions
         db.init_app(app)
         socketio.init_app(app)
-        mail.init_app(app)
+        mail.init_app(app)  # Initialize mail with the app
         bcrypt.init_app(app)
         app_logger.info('Initialized extensions')
 
@@ -63,4 +63,4 @@ def create_app(test_config=None):
 application = create_app()
 
 if __name__ == '__main__':
-    socketio.run(application, debug=True, host='0.0.0.0', port=7350)
+    socketio.run(application, debug=True, host='0.0.0.0', port=8080)

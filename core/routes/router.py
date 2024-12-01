@@ -147,7 +147,7 @@ def login():
                         session['loggedin'] = True
                         session['username'] = user.username
                         session['email'] = user.email
-                        return redirect(url_for('cryptogram.verify'))
+                        return redirect(url_for('cryptogram.index'))
                     else:
                         msg = "Email Verification Failed"
                         app_logger.warning(
@@ -166,3 +166,15 @@ def login():
 
     app_logger.info("Rendering login template")
     return render_template('login.html', msg=msg)
+
+
+@bp.route('/index')
+def index():
+    if 'loggedin' not in session:
+        return redirect(url_for('cryptogram.login'))
+        
+    userData = {
+        'Username': session['username'],
+        'Email': session['email']
+    }
+    return render_template('index.html', userData=userData)
