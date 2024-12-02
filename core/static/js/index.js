@@ -134,3 +134,278 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 });
+
+/**
+ * Initializes event listeners and loads user-specific data upon the DOM's content being fully loaded.
+ * This includes setting up logout functionality, loading cryptographic keys, 
+ * and establishing connections to handle notifications and chat messages.
+ */
+document.addEventListener('DOMContentLoaded', async () => {
+    // Sets the value of the logout button to display the username for the current session.
+    document.getElementById("logout-btn").value = "Logout-" + userData.Username;
+
+    // Loads the private and public cryptographic keys from local storage to enable secure communication.
+    await loadPrivateKey();
+    loadPublicKey();
+
+    // If there are saved client keys, reload the friend lists for various statuses (available, received, accepted).
+    if (Object.keys(clientKeys).length > 0) {
+        loadAvailableFriends();
+        loadConReceiveFriends();
+        loadAccepetdFriends();
+    }
+
+    /**
+     * Listens for a notification about an email being sent and updates the client keys accordingly.
+     * Updates the list of available and connection-received friends.
+     */
+    socket.on('email_send_notify', function (data) {
+        try {
+            clientKeys[data['sender']].status = "con_recv";
+            saveClientKeys();
+            loadConReceiveFriends();
+            loadAvailableFriends();
+        } catch (error) {
+            console.error("Error handling email_send_notify:", error);
+        }
+    });
+
+    /**
+     * Listens for a notification about a reply to an email and updates the client keys.
+     * Refreshes the lists of available and connection-received friends.
+     */
+    socket.on('email_reply_notify', function (data) {
+        try {
+            clientKeys[data['sender']].status = "con_reply_recv";
+            saveClientKeys();
+            loadAvailableFriends();
+            loadConReceiveFriends();
+        } catch (error) {
+            console.error("Error handling email_reply_notify:", error);
+        }
+    });
+
+    /**
+     * Handles incoming chat messages. Ensures secure decryption, validates message order, 
+     * and updates the chat display. Displays an error message if the order is incorrect.
+     */
+    socket.on('message', async (data) => {
+        try {
+            let ul = document.getElementById("chat-msg");
+            
+            // If the message is from a new sender, initialize a new chat session.
+            if (chatClient != data["sender"]) {
+                displaySelectFriendMessage(false);
+                let li = document.createElement("li");
+                li.appendChild(document.createTextNode(`Chat with - ${data["sender"]}`));
+                li.classList.add("center_user");
+                ul.appendChild(li);
+                ul.scrollTop = ul.scrollHeight;
+
+                chatClient = data["sender"];
+                chatClientPK = clientKeys[data["sender"]].publicKey;
+            }
+
+            isCurrentUser = false;
+
+            console.log("Sender------------", data["sender"]);
+            console.log("Sender Encrypted Message------------", data["message"]);
+
+            // Decrypt the received message using the private key and display it.
+            const decryptedMessage = await decryptMessage(privateKey, data["message"]);
+            console.log("Sender Decrypted Message------------", decryptedMessage);
+
+            clientKeys[data["sender"]].receivedMessageId += 1;
+            console.log("Received message id------------", clientKeys[data["sender"]].receivedMessageId);
+
+            const hasColon = decryptedMessage.includes(':');
+
+            // Processes the message if it's in the correct format (contains a colon to separate ID and content).
+            if (hasColon) {
+                const parts = decryptedMessage.split(/:(.+)/);
+                const receivedMessageId = parts[0];
+                const receivedMessage = parts[1];
+
+                if (receivedMessageId == clientKeys[data["sender"]].receivedMessageId) {
+                    let li = document.createElement("li");
+                    li.appendChild(document.createTextNode(data["sender"] + " : " + receivedMessage));
+                    li.classList.add("left-align");
+                    ul.appendChild(li);
+                    ul.scrollTop = ul.scrollHeight;
+                } else {
+                    const selectFriend = document.getElementById('select-friend');
+                    const message = document.createElement('p');
+                    message.style.color = 'red';
+                    message.textContent = 'Message order not correct...!!!!';
+                    selectFriend.appendChild(message);
+                }
+            } else {
+                console.log('Message format error...');
+            }
+        } catch (error) {
+            console.error("Error during decryption:", error);
+        }
+    });
+
+    /**
+     * Handles the retrieval of all users from the server and updates the client keys object.
+     * Newly discovered users are added as available, excluding the current user.
+     */
+    socket.on("allUsers", function (data) {
+        for (const [key, email] of Object.entries(data["allClients"])) {
+            console.log("-------start-------");
+            console.log('Client key ------ > ', key);
+            console.log('Username ------ > ', username);
+            
+            // Adds new users to the clientKeys object while skipping the current user.
+            if ((!(key in clientKeys)) && (key != username)) {
+                console.log("All Users------>", key);
+                clientKeys[key] = {
+                    'username': key,
+                    'publicKey': '',
+                    'email': email,
+                    'status': 'available',
+                    'sendMessageId': 0,
+                    'receivedMessageId': 0
+                };
+            }
+            console.log("-end->>>>>>");
+        }
+        console.log('available <-> ', clientKeys);
+        saveClientKeys();
+        loadAvailableFriends();
+    });
+});
+
+/**
+ * Handles the logout event triggered by the server for specific users.
+ * Updates the UI to indicate the user has logged out, removes their keys from local storage, 
+ * and refreshes the lists of available, received, and accepted friends.
+ */
+socket.on('logoutUsers', function (data) {
+    var clientKey = data['logoutUser'];
+    console.log('User logout========>', clientKey);
+    console.log('Client keys========>', clientKeys);
+
+    // If the currently active chat user logs out, update the UI and reset the active chat client.
+    if (chatClient == data['logoutUser']) {
+        let ul = document.getElementById("chat-msg");
+        let li = document.createElement("li");
+        li.appendChild(document.createTextNode(`${data['logoutUser']} - User Logout`));
+        li.classList.add("logout_user");
+        ul.appendChild(li);
+        ul.scrollTop = ul.scrollHeight;
+        chatClient = null;
+    }
+
+    // Remove the logged-out user's keys and refresh the friend lists.
+    if (clientKey in clientKeys) {
+        delete clientKeys[clientKey];
+        console.log('Client keys after delete========>', clientKeys);
+        saveClientKeys();
+        loadAvailableFriends();
+        loadConReceiveFriends();
+        loadAccepetdFriends();
+    }
+});
+
+/**
+ * Handles a server directive to redirect the user to the logout process.
+ * Triggers the client-side logout function.
+ */
+socket.on('logout_redirect', function () {
+    logout();
+});
+
+/**
+ * Logs errors related to the logout process for debugging and monitoring purposes.
+ */
+socket.on('error', function (errorData) {
+    console.log("Logout Error ------- ", errorData.message);
+});
+
+/**
+ * Handles the send button click event. Sends the message to the active chat client 
+ * if one is selected, otherwise displays a warning to select a friend first.
+ */
+document.getElementById('send').onclick = async () => {
+    if (chatClient != null) {
+        displaySelectFriendMessage(false);
+        await sendMessage();
+        socket.emit('stop_typing', { sender: username, recipient: chatClient });
+    } else {
+        displaySelectFriendMessage(true);
+    }
+};
+
+/**
+ * Handles the clear chat history button click event. Clears all chat messages from the UI.
+ */
+document.getElementById('clearHistory').onclick = async () => {
+    let ul = document.getElementById("chat-msg");
+    ul.innerHTML = "";
+};
+
+/**
+ * Handles the keypress event in the message input box.
+ * Sends the message on pressing Enter and emits typing events for other keys.
+ */
+document.getElementById("message-input").addEventListener("keypress", async function (event) {
+    if (event.key === "Enter") {
+        if (chatClient != null) {
+            displaySelectFriendMessage(false);
+            await sendMessage();
+            socket.emit('stop_typing', { sender: username, recipient: chatClient });
+        } else {
+            displaySelectFriendMessage(true);
+        }
+    } else {
+        console.log("Keypress detected, sending typing event");
+        socket.emit('typing', { sender: username, recipient: chatClient });
+    }
+});
+
+/**
+ * Handles the keyup event in the message input box. Stops the typing indicator when Enter is pressed.
+ */
+document.getElementById("message-input").addEventListener("keyup", function (event) {
+    if (event.key === "Enter") {
+        console.log("Enter key pressed, sending stop typing event");
+        socket.emit('stop_typing', { sender: username, recipient: chatClient });
+    }
+});
+
+/**
+ * Handles the blur event (input losing focus) in the message input box.
+ * Stops the typing indicator when the input is no longer active.
+ */
+document.getElementById("message-input").addEventListener("blur", function () {
+    console.log("Input lost focus, sending stop typing event");
+    socket.emit('stop_typing', { sender: username, recipient: chatClient });
+});
+
+/**
+ * Handles the logout button click event. Sends a logout event to the server and clears local storage data.
+ */
+document.getElementById('logout-btn').onclick = () => {
+    socket.emit('logout', { user_name: username });
+    localStorage.clear();
+};
+
+/**
+ * Displays a typing indicator when a typing event is received from another user.
+ */
+socket.on('typing', function (data) {
+    console.log("Received typing event from", data.sender);
+    const typingIndicator = document.getElementById("typing-indicator");
+    typingIndicator.textContent = data.sender + " is typing...";
+});
+
+/**
+ * Removes the typing indicator when a stop typing event is received from another user.
+ */
+socket.on('stop_typing', function (data) {
+    console.log("Received stop typing event from", data.sender);
+    const typingIndicator = document.getElementById("typing-indicator");
+    typingIndicator.textContent = "";
+});
