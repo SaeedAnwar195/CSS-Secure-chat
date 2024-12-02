@@ -55,6 +55,26 @@ class EmailService:
             """
         mail.send(msg)
         return otp
+    
+    @staticmethod
+    def send_key_email(email, key):
+        
+        msg = Message(
+            'Secure Key - Cryptogram',
+            sender=current_app.config['MAIL_USERNAME'],
+            recipients=email
+        )
+        msg.body = f"""
+            Here is the connection key for Cryptogram::
+                {key}
+            """
+        mail.send(msg)
+
+        if msg:
+            return True
+        else:
+            
+            return False
 
 
 class ChatManager:

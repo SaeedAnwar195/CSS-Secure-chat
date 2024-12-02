@@ -157,7 +157,7 @@ def login():
                     app_logger.warning(
                         f"Password mismatch for user: {email}")
             else:
-                msg = "Incorrect Username or Password"
+                msg = "User not found"
                 app_logger.warning(f"User not found: {email}")
 
         except Exception as ex:
@@ -366,13 +366,7 @@ def internal_error(error):
 def send_key_email():
     data = request.json
     try:
-        msg = Message(
-            'Cryptogram Connection Key',
-            sender=current_app.config['MAIL_USERNAME'],
-            recipients=[data['email']]
-        )
-        msg.body = f"Here is the connection key for Cryptogram:\n\n{data['key']}"
-        mail.send(msg)
-        return jsonify({'success': True})
+        response = EmailService.send_key_email(data['email'], data['key'] )
+        return jsonify({'success': response})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
