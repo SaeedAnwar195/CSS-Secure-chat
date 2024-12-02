@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cryptogram - Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+    <style>
+        .user-info {
+            text-align: left;
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        .user-info p {
+            margin: 10px 0;
+            color: #00838f;
+            font-size: 1.1em;
+        }
+
+        .user-info span {
+            font-weight: bold;
+            color: #006064;
+        }
+
+        .logout-btn {
+            background: #ff6b6b;
+            color: white;
+            margin-top: 20px;
+        }
+
+        .logout-btn:hover {
+            background: #ff5252;
+            transform: translateY(-2px);
+        }
+
+        .welcome-message {
+            color: #006064;
+            margin-bottom: 20px;
+            font-size: 1.2em;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Cryptogram</h1>
+    </header>
+    <div class="container">
+        <div class="card">
+            <h2>Dashboard</h2>
+            <div class="welcome-message">
+                Welcome back, {{ userData.Username }}!
+            </div>
+            <div class="user-info">
+                <p>Username: <span>{{ userData.Username }}</span></p>
+                <p>Email: <span>{{ userData.Email }}</span></p>
+            </div>
+            <form action="{{ url_for('cryptogram.login') }}" method="get">
+                <input type="submit" class="form-submit btn logout-btn" value="Logout">
+            </form>
+        </div>
+    </div>
+</body>
+</html>
