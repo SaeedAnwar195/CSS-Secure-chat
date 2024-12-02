@@ -181,56 +181,48 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             let ul = document.getElementById("chat-msg");
             if (chatClient != data["sender"]) {
-                displaySelectFriendMessage(false)
+                displaySelectFriendMessage(false);
                 let li = document.createElement("li");
                 li.appendChild(document.createTextNode(`Chat with - ${data["sender"]}`));
                 li.classList.add("center_user");
                 ul.appendChild(li);
                 ul.scrollTop = ul.scrollHeight;
-
-                chatClient = data["sender"]
-                chatClientPK = clientKeys[data["sender"]].publicKey
+    
+                chatClient = data["sender"];
+                chatClientPK = clientKeys[data["sender"]].publicKey;
             }
-
+    
             isCurrentUser = false;
-
-            console.log("Sender------------", data["sender"]);
-            console.log("Sender Encrypted Message------------", data["message"]);
-
+            console.group('Message Processing');
+            console.log('From:', data["sender"]);
+    
             const decryptedMessage = await decryptMessage(privateKey, data["message"]);
-            console.log("Sender Decrypted Message------------", decryptedMessage);
-
-            clientKeys[data["sender"]].receivedMessageId = clientKeys[data["sender"]].receivedMessageId + 1
-            console.log("Received message id------------", clientKeys[data["sender"]].receivedMessageId);
-
-            const hasColon = decryptedMessage.includes(':');
-
-            if (hasColon) {
-                const parts = decryptedMessage.split(/:(.+)/);
-
-                const receivedMessageId = parts[0];
-                const receivedMessage = parts[1];
-
-                if (receivedMessageId == clientKeys[data["sender"]].receivedMessageId) {
-                    let li = document.createElement("li");
-                    li.appendChild(document.createTextNode(data["sender"] + " : " + receivedMessage));
-                    li.classList.add("left-align");
-                    ul.appendChild(li);
-                    ul.scrollTop = ul.scrollHeight;
-                } else {
-                    const selectFriend = document.getElementById('select-friend');
-                    const message = document.createElement('p');
-                    message.style.color = 'red';
-                    message.textContent = 'Message order not correct...!!!!';
-                    selectFriend.appendChild(message);
-                }
-            } else {
-                console.log('Message format error...');
-            }
-
+            const [messageId, message] = decryptedMessage.split(/:(.+)/);
             
+            // Validate message order
+            const expectedId = (clientKeys[data["sender"]].receivedMessageId || 0) + 1;
+            if (parseInt(messageId) !== expectedId) {
+                console.error(`Message order incorrect. Expected: ${expectedId}, Got: ${messageId}`);
+                const selectFriend = document.getElementById('select-friend');
+                const errorMsg = document.createElement('p');
+                errorMsg.style.color = 'red';
+                errorMsg.textContent = `Message order incorrect (${messageId}/${expectedId}). Synchronization issue detected.`;
+                selectFriend.appendChild(errorMsg);
+                return;
+            }
+    
+            // Update message counter and display message
+            clientKeys[data["sender"]].receivedMessageId = expectedId;
+            let li = document.createElement("li");
+            li.appendChild(document.createTextNode(`${data["sender"]} : ${message}`));
+            li.classList.add("left-align");
+            ul.appendChild(li);
+            ul.scrollTop = ul.scrollHeight;
+            
+            console.groupEnd();
+            saveClientKeys(); // Save updated message counter
         } catch (error) {
-            console.error("Error during decryption:", error);
+            console.error("Error processing message:", error);
         }
     });
 
@@ -444,7 +436,7 @@ function loadConReceiveFriends() {
                 <div class="status-indicator"></div>
                 <div class="username">${key}</div>
                 <div class="last-active" id="last-active-${key}"></div>
-                <div class="action"><input type="button" name="add_friend" value="Add ParsePhase" onclick='loadReply(${JSON.stringify(user)}, "${publicKey}")'></div>
+                <div class="action"><input type="button" name="add_friend" value="Add Chat Secret" onclick='loadReply(${JSON.stringify(user)}, "${publicKey}")'></div>
             `;
         } else if (user['status'] == 'con_recv' && user['publicKey'] != "") {
             console.log("con_recv:Public key---------------> "+publicKey);
@@ -739,47 +731,48 @@ function loadReply(obj, publicKey) {
     }
 }
 
-function publicKeyLoadForm(obj, showMsg, msg = '') {
-    const conditionalP = showMsg ? `<p style="color: red;">${msg}</p>` : '';
-
-    formContent = `
-        <div class="email-form-container">
-            <label for="body_parsephase">ParsePhase:</label>
-            <textarea id="body_parsephase" name="body" placeholder="Enter the Public Key received via the email. Please check email and enter the Public Key" required></textarea>
-            ${conditionalP}
-            <button type="button" name="connect" onclick='OnAddParsePhaseClick(${JSON.stringify(obj)})'>Add ParsePhase</button>
-        </div>
-        `;
-    if (clientKeys[obj.username].status == "con_reply_recv") {
-        clientKeys[obj.username].status = "accepted";
-        saveClientKeys();
-    }
-    document.getElementById('email_reply_form').innerHTML = formContent;
-}
 
 async function sendMessage() {
-    clientKeys[chatClient].sendMessageId = clientKeys[chatClient].sendMessageId + 1
-    console.log("Send message number----------->", clientKeys[chatClient].sendMessageId)
-    const clientMessageText = document.getElementById('message-input').value;
-    const clientMessage = clientKeys[chatClient].sendMessageId + ':' + clientMessageText;
-    console.log("Message before encrypt-----------", clientMessage)
-    const encryptedMessage = await encryptMessage(chatClientPK, clientMessage)
-    console.log("Message after encrypt-----------", encryptedMessage)
-    if (chatClient && clientMessage.trim() !== "") {
-        document.getElementById("message-input").value = "";
-        socket.emit('message', { recipient_name: chatClient, message: encryptedMessage });
+    try {
+        if (!chatClientPK) {
+            console.error('No public key available for recipient');
+            return;
+        }
 
-        isCurrentUser = true;
+        clientKeys[chatClient].sendMessageId = (clientKeys[chatClient].sendMessageId || 0) + 1;
+        const messageId = clientKeys[chatClient].sendMessageId;
+        
+        const clientMessageText = document.getElementById('message-input').value;
+        if (!clientMessageText.trim()) {
+            console.error('Empty message cannot be sent');
+            return;
+        }
+
+        const clientMessage = `${messageId}:${clientMessageText}`;
+        console.group('Message Encryption');
+        console.log('Message ID:', messageId);
+        console.log('Original message:', clientMessageText);
+        
+        const encryptedMessage = await encryptMessage(chatClientPK, clientMessage);
+        
+        socket.emit('message', { 
+            recipient_name: chatClient, 
+            message: encryptedMessage 
+        });
+
+        // Update UI
         let ul = document.getElementById("chat-msg");
         let li = document.createElement("li");
         li.appendChild(document.createTextNode("Me : " + clientMessageText));
         li.classList.add("right-align");
         ul.appendChild(li);
         ul.scrollTop = ul.scrollHeight;
-    } else if (clientMessage.trim() === "") {
-        console.error('Empty message cannot be sent');
-    } else {
-        console.error('No chat client selected');
+
+        // Clear input
+        document.getElementById("message-input").value = "";
+        console.groupEnd();
+    } catch (error) {
+        console.error('Error sending message:', error);
     }
 }
 
@@ -973,4 +966,358 @@ function logout() {
     }).catch(error => {
         console.error("Logout error:", error);
     });
+}
+
+/*
+ * Key Exchange UI Management
+ * Handles the display and interaction for secure key exchange
+ */
+function showKeyExchangeModal(user, isInitiator = true) {
+    const modalHTML = `
+        <div class="modal-overlay">
+            <div class="key-exchange-modal">
+                <div class="key-exchange-header">
+                    <h2>${isInitiator ? 'Send Connection Request' : 'Accept Connection Request'}</h2>
+                    <p>${isInitiator ? 
+                        `Share your public key with ${user.username}` : 
+                        `Share your public key with ${user.username} and verify their key`}</p>
+                </div>
+                
+                ${isInitiator ? `
+                    <div class="key-field-container">
+                        <textarea class="key-input" readonly>${publicKey}</textarea>
+                        <div class="key-actions">
+                            <button class="key-btn copy-btn" onclick="copyKey()">
+                                <span>📋</span> Copy Key
+                            </button>
+                            <button class="key-btn send-btn" onclick="sendKeyByEmail('${user.email}')">
+                                <span>📤</span> Send via Email
+                            </button>
+                        </div>
+                        <div class="success-message" id="success-message"></div>
+                    </div>
+                ` : `
+                    <div class="key-field-container">
+                        <textarea class="key-input" placeholder="Paste the received public key here" id="received-key"></textarea>
+                        <div class="key-actions">
+                            <button class="key-btn copy-btn" onclick="copyKey()">
+                                <span>📋</span> Copy My Key
+                            </button>
+                            <button class="key-btn send-btn" onclick="verifyAndSendKey('${user.email}')">
+                                <span>✅</span> Verify & Send
+                            </button>
+                        </div>
+                        <div class="success-message" id="success-message"></div>
+                    </div>
+                `}
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+}
+
+async function copyKey() {
+    try {
+        await navigator.clipboard.writeText(publicKey);
+        const successMessage = document.getElementById('success-message');
+        successMessage.textContent = 'Key copied to clipboard!';
+        successMessage.classList.add('show');
+        setTimeout(() => successMessage.classList.remove('show'), 3000);
+    } catch (err) {
+        console.error('Failed to copy key:', err);
+    }
+}
+
+async function sendKeyByEmail(recipientEmail) {
+    try {
+        const emailData = {
+            to: recipientEmail,
+            subject: 'Cryptogram Connection Request',
+            body: `Your connection key is: ${publicKey}\n\nPlease use this key to establish a secure connection in Cryptogram.`
+        };
+
+        const response = await fetch('/api/send-email', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(emailData)
+        });
+
+        if (response.ok) {
+            const successMessage = document.getElementById('success-message');
+            successMessage.textContent = 'Key sent successfully!';
+            successMessage.classList.add('show');
+            
+            // Update UI state
+            clientKeys[recipientEmail].status = "con_sent";
+            saveClientKeys();
+            loadAvailableFriends();
+            
+            // Close modal after delay
+            setTimeout(() => {
+                document.querySelector('.modal-overlay').remove();
+            }, 2000);
+        } else {
+            throw new Error('Failed to send email');
+        }
+    } catch (error) {
+        console.error('Email sending failed:', error);
+    }
+}
+
+async function verifyAndSendKey(senderEmail) {
+    const receivedKey = document.getElementById('received-key').value;
+    
+    if (!receivedKey) {
+        const successMessage = document.getElementById('success-message');
+        successMessage.textContent = 'Please paste the received key first';
+        successMessage.classList.add('show');
+        return;
+    }
+
+    try {
+        // Verify the received key
+        if (verifyKey(receivedKey)) {
+            await sendKeyByEmail(senderEmail);
+            clientKeys[senderEmail].publicKey = receivedKey;
+            clientKeys[senderEmail].status = "accepted";
+            saveClientKeys();
+            loadAccepetdFriends();
+        } else {
+            throw new Error('Invalid key format');
+        }
+    } catch (error) {
+        console.error('Key verification failed:', error);
+    }
+}
+
+function openEmailClientWindow(obj, publicKey) {    
+    if(obj.status == 'available') {
+        // Instead of opening email window, show key exchange UI
+        showKeyExchangeModal(obj);
+        clientKeys[obj.username].status = "con_sent";
+        saveClientKeys();
+        socket.emit('send_email_notification', { 
+            recipient_name: obj.username, 
+            notification: "Public Key Request Send" 
+        });
+        loadAvailableFriends();
+    }
+}
+
+function showKeyExchangeModal(user) {
+    const formContent = `
+        <div class="parse-phase-container">
+            <div class="parse-phase-header">
+                <h3>Share Your Key</h3>
+                <p>Send your public key to ${user.username}</p>
+            </div>
+            <div class="parse-phase-field">
+                <textarea class="parse-phase-input" id="key-content" readonly>${publicKey}</textarea>
+                <div class="parse-phase-actions">
+                    <button onclick="copyKeyToClipboard()" class="parse-phase-button">
+                        <span class="btn-icon">📋</span> Copy Key
+                    </button>
+                    <button onclick="sendKeyByEmail('${user.email}')" class="parse-phase-button">
+                        <span class="btn-icon">📧</span> Send via Email
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.getElementById('email_request_form').innerHTML = formContent;
+}
+
+function publicKeyLoadForm(obj, showMsg, msg = '') {
+    const formContent = `
+        <div class="parse-phase-container">
+            <div class="parse-phase-header">
+                <h3>Enter Received Key</h3>
+                <p>Paste the public key received from ${obj.username}</p>
+            </div>
+            <div class="parse-phase-field">
+                <textarea 
+                    id="body_parsephase" 
+                    class="parse-phase-input" 
+                    placeholder="Paste the received key here"
+                ></textarea>
+                ${showMsg ? `<div class="parse-phase-error show">${msg}</div>` : ''}
+                <button 
+                    onclick='OnAddParsePhaseClick(${JSON.stringify(obj)})' 
+                    class="parse-phase-button"
+                >
+                    <span class="btn-icon">✅</span> Add ParsePhase
+                </button>
+            </div>
+        </div>
+    `;
+
+    if (clientKeys[obj.username].status == "con_reply_recv") {
+        clientKeys[obj.username].status = "accepted";
+        saveClientKeys();
+    }
+    document.getElementById('email_reply_form').innerHTML = formContent;
+}
+
+async function copyKeyToClipboard() {
+    const keyContent = document.getElementById('key-content');
+    try {
+        await navigator.clipboard.writeText(keyContent.value);
+        showNotification('Key copied to clipboard!');
+    } catch (err) {
+        showNotification('Failed to copy key', 'error');
+    }
+}
+
+async function sendKeyByEmail(recipientEmail) {
+    try {
+        const response = await fetch('/send-key-email', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                email: recipientEmail,
+                key: publicKey
+            })
+        });
+
+        if (response.ok) {
+            showNotification('Key sent via email!');
+        } else {
+            throw new Error('Failed to send email');
+        }
+    } catch (error) {
+        showNotification('Failed to send email', 'error');
+    }
+}
+
+function showNotification(message, type = 'success') {
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 3000);
+}
+
+function loadReply(obj, publicKey) {
+    let formContent;
+
+    if (clientKeys[obj.username].status == "con_recv" && clientKeys[obj.username].publicKey != "") {
+        // Show key exchange UI instead of opening email window
+        showKeyExchangeUI(obj, publicKey, true);
+        clientKeys[obj.username].status = "accepted";
+        saveClientKeys();
+        socket.emit('reply_email_notification', { 
+            recipient_name: obj.username, 
+            notification: "Public Key Reply Send" 
+        });
+        loadConReceiveFriends();
+        loadAccepetdFriends();
+    } else {
+        publicKeyLoadForm(obj, false, 'nil');
+    }
+}
+
+function showKeyExchangeUI(obj, publicKey, isConfirmation = false) {
+    const formContent = `
+        <div class="parse-phase-container">
+            <div class="parse-phase-header">
+                <h3>${isConfirmation ? 'Send Confirmation Key' : 'Share Your Key'}</h3>
+                <p>${isConfirmation ? 
+                    `Send your public key to confirm connection with ${obj.username}` : 
+                    `Share your public key with ${obj.username}`}</p>
+            </div>
+            
+            <div class="parse-phase-field">
+                <label for="key-display">Your Public Key:</label>
+                <textarea 
+                    id="key-display" 
+                    class="parse-phase-input" 
+                    readonly
+                >${publicKey}</textarea>
+                
+                <div class="parse-phase-actions">
+                    <button onclick="copyKeyToClipboard('key-display')" class="parse-phase-button">
+                        <span>📋</span> Copy Key
+                    </button>
+                    <button onclick="sendKeyByEmail('${obj.email}', '${publicKey}')" class="parse-phase-button">
+                        <span>📧</span> Send via Email
+                    </button>
+                </div>
+                
+                <div id="key-action-message" class="parse-phase-message"></div>
+            </div>
+        </div>
+    `;
+
+    const targetElement = isConfirmation ? 
+        document.getElementById('email_reply_form') : 
+        document.getElementById('email_request_form');
+    targetElement.innerHTML = formContent;
+}
+
+async function copyKeyToClipboard(elementId) {
+    try {
+        const keyContent = document.getElementById(elementId).value;
+        await navigator.clipboard.writeText(keyContent);
+        showActionMessage('Key copied to clipboard!', 'success');
+    } catch (err) {
+        showActionMessage('Failed to copy key', 'error');
+        console.error('Copy failed:', err);
+    }
+}
+
+async function sendKeyByEmail(recipientEmail, key) {
+    try {
+        const response = await fetch('/send-key-email', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                to: recipientEmail,
+                subject: 'Cryptogram Connection Key',
+                key: key
+            })
+        });
+
+        if (response.ok) {
+            showActionMessage('Key sent via email!', 'success');
+        } else {
+            throw new Error('Failed to send email');
+        }
+    } catch (error) {
+        showActionMessage('Failed to send email', 'error');
+        console.error('Email error:', error);
+    }
+}
+
+function showActionMessage(message, type = 'success') {
+    const messageElement = document.getElementById('key-action-message');
+    if (messageElement) {
+        messageElement.textContent = message;
+        messageElement.className = `parse-phase-message ${type}`;
+        setTimeout(() => {
+            messageElement.textContent = '';
+        }, 3000);
+    }
+}
+
+function verifyKey(key) {
+    // Check if key has the correct format (username:base64key)
+    const hasColon = key.includes(':');
+    if (!hasColon) return false;
+
+    const [keyUsername, keyData] = key.split(/:(.+)/);
+    // Verify the key belongs to the correct user
+    if (!keyUsername) return false;
+    
+    // Verify the key is valid base64
+    return isBase64(keyData);
 }
