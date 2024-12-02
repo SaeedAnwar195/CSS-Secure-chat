@@ -259,3 +259,104 @@ def reset_password_verify():
             return render_template('reset_password_verify.html', msg="An error occurred. Please try again.")
 
     return render_template('reset_password_verify.html')
+
+
+@bp.route('/logout')
+def logout():
+    """Handle user logout by clearing session data."""
+    app_logger.info(
+        f"Processing logout for user: {session.get('username', 'Unknown')}")
+
+    try:
+        # Clear all session data
+        session.pop('loggedin', None)
+        session.pop('username', None)
+        session.pop('email', None)
+        session.pop('profile', None)
+        session.pop('google_oauth_state', None)
+
+        app_logger.info("User successfully logged out")
+        return redirect(url_for('cryptogram.login'))
+
+    except Exception as e:
+        app_logger.error(f"Error during logout: {str(e)}")
+        return redirect(url_for('cryptogram.login'))
+
+
+@bp.route('/compose_email', methods=['GET', 'POST'])
+def compose_email():
+    """Handle email composition and sending."""
+    app_logger.info("Accessed email composition route")
+
+    if 'loggedin' not in session:
+        app_logger.warning("Unauthorized access attempt to compose email")
+        return redirect(url_for('cryptogram.login'))
+
+    if request.method == 'POST':
+        try:
+            recipient = request.form.get('recipient')
+            subject = request.form.get('subject')
+            body = request.form.get('body')
+
+            app_logger.info(f"Composing email to: {recipient}")
+
+            # Create mailto link for external email client
+            mailto_link = f"mailto:{recipient}?subject={subject}&body={body}"
+            return redirect(mailto_link)
+
+        except Exception as e:
+            app_logger.error(f"Error in email composition: {str(e)}")
+            return redirect(url_for('cryptogram.index'))
+
+    return redirect(url_for('cryptogram.index'))
+
+
+@bp.route('/send_email', methods=['GET', 'POST'])
+def send_email():
+    """Handle sending emails through the application."""
+    app_logger.info("Accessed send email route")
+
+    if 'loggedin' not in session:
+        app_logger.warning("Unauthorized access attempt to send email")
+        return redirect(url_for('cryptogram.login'))
+
+    if request.method == 'POST':
+        try:
+            email = request.form['email']
+            subject = request.form['subject']
+            body = request.form['body']
+
+            app_logger.debug(f"Sending email to: {email}, Subject: {subject}")
+
+            # Create and send email message
+            msg = Message(
+                subject,
+                recipients=[email]
+            )
+            msg.body = body
+            mail.send(msg)
+
+            app_logger.info(f"Email sent successfully to: {email}")
+            flash('Email sent successfully!', 'success')
+            return redirect(url_for('cryptogram.send_email'))
+
+        except Exception as e:
+            app_logger.error(f"Error sending email: {str(e)}")
+            flash('Failed to send email. Please try again.', 'error')
+
+    return render_template('send_email.html')
+
+
+@bp.errorhandler(404)
+def not_found_error(error):
+    """Handle 404 Not Found errors."""
+    app_logger.warning(f"404 error: {request.url}")
+    return render_template('errors/404.html'), 404
+
+
+@bp.errorhandler(500)
+def internal_error(error):
+    """Handle 500 Internal Server Error."""
+    app_logger.error(f"500 error: {str(error)}")
+    db.session.rollback()
+    return render_template('errors/500.html'), 500
