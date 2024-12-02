@@ -409,3 +409,292 @@ socket.on('stop_typing', function (data) {
     const typingIndicator = document.getElementById("typing-indicator");
     typingIndicator.textContent = "";
 });
+
+/**
+ * Function to initialize the user by setting up their username, loading keys, and establishing a socket connection.
+ * If a private key exists in localStorage, it is loaded. Otherwise, a new RSA key pair is generated.
+ * The user's public key is also loaded, and a socket connection is initiated.
+ */
+async function initiateUser() {
+    try {
+        username = userData.Username;
+        console.log("Initiating user with username:", username);
+
+        // Check if private key exists in localStorage and load it if present.
+        const privateKeyBase64 = localStorage.getItem('privateKey');
+        if (privateKeyBase64) {
+            await loadPrivateKey();
+            console.log("Using existing private key.");
+        } else {
+            publicKey = await generateRSAKeyPair();
+            console.log("Generated new RSA key pair.");
+        }
+
+        // Load public key from localStorage.
+        loadPublicKey();
+
+        // Establish socket connection and emit user join event with username and email.
+        socket.connect();
+        console.log("Socket connection established for username:", userData.Username);
+        console.log("User email:", userData.Email);
+        socket.on("connect", function () {
+            socket.emit('user_join', { recipient: userData.Username, email: userData.Email });
+        });
+    } catch (error) {
+        console.error("Error during user initialization:", error);
+    }
+}
+
+/**
+ * Function to load and display the list of available friends.
+ * Displays different actions based on the user's status (e.g., available, invitation sent).
+ */
+function loadAvailableFriends() {
+    var friendsList = document.getElementById("friends-list");
+    friendsList.innerHTML = "";
+
+    for (const [key, user] of Object.entries(clientKeys)) {
+        console.log("Loading available friend:", user.username);
+        console.log("Email:", user.email);
+        console.log("Status:", user.status);
+
+        let li = document.createElement("li");
+
+        console.log("User status (available friends):", user.status);
+        if (user.status === 'con_sent') {
+            li.innerHTML = `
+                <div class="status-indicator"></div>
+                <div class="username">${key}</div>
+                <div class="last-active" id="last-active-${key}"></div>
+                <div class="action"><input type="button" style="background-color:rgb(196, 128, 32);" value="Invitation Sent" disabled></div>
+            `;
+        } else if (user.status === 'available') {
+            console.log("User public key:", publicKey);
+            li.innerHTML = `
+                <div class="status-indicator"></div>
+                <div class="username">${key}</div>
+                <div class="last-active" id="last-active-${key}"></div>
+                <div class="action"><input type="button" name="connect" value="Invite to chat" onclick='openEmailClientWindow(${JSON.stringify(user)}, "${publicKey}")'></div>
+            `;
+        }
+
+        friendsList.appendChild(li);
+    }
+}
+
+/**
+ * Function to load and display the list of received connection requests.
+ * Displays different actions based on the user's status and presence of a public key.
+ */
+function loadConReceiveFriends() {
+    var friendsList = document.getElementById("received-list");
+    friendsList.innerHTML = "";
+
+    for (const [key, user] of Object.entries(clientKeys)) {
+        console.log("Loading connection request from user:", user.username);
+        console.log("Email:", user.email);
+        console.log("Status:", user.status);
+
+        let li = document.createElement("li");
+
+        console.log("User status (received connections):", user.status);
+        if ((user.status === 'con_recv' || user.status === 'con_reply_recv') && user.publicKey === "") {
+            li.innerHTML = `
+                <div class="status-indicator"></div>
+                <div class="username">${key}</div>
+                <div class="last-active" id="last-active-${key}"></div>
+                <div class="action"><input type="button" name="add_friend" value="Add ParsePhase" onclick='loadReply(${JSON.stringify(user)}, "${publicKey}")'></div>
+            `;
+        } else if (user.status === 'con_recv' && user.publicKey !== "") {
+            console.log("Public key available for user:", publicKey);
+            li.innerHTML = `
+                <div class="status-indicator"></div>
+                <div class="username">${key}</div>
+                <div class="last-active" id="last-active-${key}"></div>
+                <div class="action"><input type="button" name="add_friend" value="Send Confirmation" style="background-color:rgb(196, 128, 32);" onclick='loadReply(${JSON.stringify(user)}, "${publicKey}")'></div>
+            `;
+        }
+
+        friendsList.appendChild(li);
+    }
+}
+
+/**
+ * Handles the Add ParsePhase button click. Extracts and validates the public key
+ * from the input, updates the client's keys, and reloads the received and accepted friends lists.
+ * @param {*} friendObj - The object containing friend data.
+ */
+function OnAddParsePhaseClick(friendObj) {
+    var parsePhase = document.getElementById("body_parsephase").value;
+    console.log("Adding ParsePhase for user:", friendObj.username);
+    console.log("ParsePhase value entered:", parsePhase);
+
+    const hasColon = parsePhase.includes(':');
+    if (hasColon) {
+        const parts = parsePhase.split(/:(.+)/);
+        const parsePhaseUser = parts[0];
+        const parsePhasePublicKey = parts[1];
+
+        if (parsePhaseUser === friendObj.username) {
+            console.log("Public key validated for user:", parsePhaseUser);
+            clientKeys[friendObj.username].publicKey = parsePhasePublicKey;
+            document.getElementById('email_request_form').innerHTML = '';
+            document.getElementById('email_reply_form').innerHTML = '';
+            saveClientKeys();
+            loadConReceiveFriends();
+            loadAccepetdFriends();
+        } else {
+            console.error("Incorrect public key entered for user:", friendObj.username);
+            publicKeyLoadForm(friendObj, true, 'Please Enter Correct Public Key');
+        }
+    } else {
+        console.error("Public key format invalid. No colon detected.");
+        publicKeyLoadForm(friendObj, true, 'Please Enter Correct Public Key');
+    }
+}
+
+/**
+ * Loads the chat list of accepted friends by iterating over the clientKeys.
+ * Filters users with a status of 'accepted' and displays them in the connections list.
+ * Clicking on a user switches the active chat client and appends a message in the chat.
+ */
+function loadAccepetdFriends() {
+    var friendsList = document.getElementById("connections-list");
+    friendsList.innerHTML = "";
+
+    for (const [key, user] of Object.entries(clientKeys)) {
+        console.log(`Loading user: ${user.username}, Email: ${user.email}, Status: ${user.status}`);
+
+        let li = document.createElement("li");
+
+        console.log(`Checking user status for: ${user.username}, Status: ${user.status}`);
+        if (user.status === 'accepted') {
+            li.innerHTML = `
+                <div class="status-indicator"></div>
+                <div class="username">${key}</div>
+                <div class="last-active" id="last-active-${key}"></div>
+            `;
+
+            li.addEventListener("click", () => {
+                if (chatClient !== key) {
+                    chatClient = key;
+                    chatClientPK = user.publicKey;
+                    displaySelectFriendMessage(false);
+
+                    let ul = document.getElementById("chat-msg");
+                    let li = document.createElement("li");
+                    li.appendChild(document.createTextNode(`Chat with - ${chatClient}`));
+                    li.classList.add("center_user");
+                    ul.appendChild(li);
+                    ul.scrollTop = ul.scrollHeight;
+
+                    console.log(`Chat client switched to: ${chatClient}`);
+                }
+            });
+        }
+
+        friendsList.appendChild(li);
+    }
+}
+
+/**
+ * Handles sending connection requests and updates the clientKeys status accordingly.
+ * Also triggers appropriate UI updates based on the status ('con_sent' or 'con_recv').
+ */
+function OnRequestSend(obj, status) {
+    console.log(`Handling request send for user: ${obj.username}, Status: ${status}`);
+
+    if (status === "con_sent") {
+        clientKeys[obj.username].status = "con_sent";
+        saveClientKeys();
+        socket.emit('send_email_notification', { 
+            recipient_name: obj.username, 
+            notification: "Public Key Request Sent" 
+        });
+        loadAvailableFriends();
+        console.log(`Connection request sent to: ${obj.username}`);
+    } else if (status === "con_recv") {
+        clientKeys[obj.username].status = "accepted";
+        saveClientKeys();
+        socket.emit('reply_email_notification', { 
+            recipient_name: obj.username, 
+            notification: "Public Key Reply Sent" 
+        });
+        loadConReceiveFriends();
+        loadAccepetdFriends();
+        console.log(`Connection accepted for: ${obj.username}`);
+    }
+
+    document.getElementById('email_request_form').innerHTML = '';
+    document.getElementById('email_reply_form').innerHTML = '';
+}
+
+/**
+ * Opens a new browser window for sending an email request with an invitation.
+ * Pre-fills the form fields with the recipient's email, subject, and body.
+ */
+function openEmailClientWindow(obj, publicKey) {
+    console.log(`Opening email client for: ${obj.username}, Status: ${obj.status}`);
+
+    if (obj.status === 'available') {
+        clientKeys[obj.username].status = "con_sent";
+        saveClientKeys();
+        socket.emit('send_email_notification', { 
+            recipient_name: obj.username, 
+            notification: "Public Key Request Sent" 
+        });
+        loadAvailableFriends();
+    }
+
+    const emailWindow = window.open('', '_blank', 'width=600,height=400');
+    const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Send Gobuzz Chat Invitation</title>
+            <style>
+                /* Add your CSS styles for the email client window here */
+            </style>
+        </head>
+        <body>
+            <div class="email-form-container">
+                <form id="emailForm">
+                    <label for="email">To:</label>
+                    <input type="email" id="email" name="email" value="${obj.email}" required>
+                    <label for="subject">Subject:</label>
+                    <input type="text" id="subject" name="subject" value="GoBuzz Chat Invitation" required>
+                    <label for="body">Body:</label>
+                    <textarea id="body" name="body" required>${publicKey}</textarea>  
+                    <button type="submit">Send Request</button>
+                </form>
+            </div>
+        </body>
+        </html>
+    `;
+
+    emailWindow.document.write(htmlContent);
+    emailWindow.document.close();
+
+    const scriptContent = `
+        document.getElementById('emailForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const email = document.getElementById('email').value;
+            const subject = document.getElementById('subject').value;
+            const body = document.getElementById('body').value;
+
+            if (email && subject && body) {
+                const mailtoLink = 'mailto:' + email + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+                window.open(mailtoLink, '_blank');
+                window.close();
+            } else {
+                alert('All fields are required.');
+            }
+        });
+    `;
+
+    const script = emailWindow.document.createElement('script');
+    script.textContent = scriptContent;
+    emailWindow.document.body.appendChild(script);
+    console.log(`Email client window prepared for: ${obj.email}`);
+}
+
