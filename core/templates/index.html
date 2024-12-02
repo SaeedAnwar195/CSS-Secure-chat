@@ -1,23 +1,36 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- Meta tags for character set and viewport settings -->
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Link to external CSS file -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
+    
+    <!-- Google Fonts: Poppins -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Socket.IO for real-time communication -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    
+    <!-- Link to custom JavaScript file -->
     <script src="{{ url_for('static', filename='index.js') }}"></script>
+    
+    <!-- Page title -->
     <title>Cryptogram - Chat</title>
 </head>
 <body onload="initiateUser()">
     <div class="app-container">
-        <!-- Header -->
+        <!-- Header Section -->
         <header class="app-header">
             <div class="header-content">
                 <h1>Cryptogram</h1>
                 <div class="user-info">
+                    <!-- Display the username -->
                     <span class="username">{{ userData.Username }}</span>
+                    <!-- Logout button -->
                     <form action="{{ url_for('cryptogram.login') }}" method="get">
                         <input type="submit" class="form-submit btn logout-btn" value="Logout">
                     </form>
@@ -25,9 +38,9 @@
             </div>
         </header>
 
-        <!-- Main Content -->
+        <!-- Main Content Area -->
         <main class="main-content">
-            <!-- Navigation Tabs -->
+            <!-- Navigation Tabs for different sections -->
             <nav class="tab-navigation">
                 <button class="tab-btn active" onclick="openTab(event, 'FriendList')">
                     <span class="tab-icon">👥</span>
@@ -43,13 +56,15 @@
                 </button>
             </nav>
 
-            <!-- Tab Contents -->
+            <!-- Friends List Tab -->
             <div id="FriendList" class="tab-content active">
                 <div class="content-grid">
+                    <!-- Friends List Section -->
                     <div class="friends-section">
                         <h2>Friends List</h2>
                         <div class="friends-list" id="friends-list"></div>
                     </div>
+                    <!-- Connection Request Section -->
                     <div class="action-section" id="div_connect_request">
                         <div class="action-card">
                             <h3>Send Connection Request</h3>
@@ -60,12 +75,15 @@
                 </div>
             </div>
 
+            <!-- Pending Requests Tab -->
             <div id="PendingRequests" class="tab-content">
                 <div class="content-grid">
+                    <!-- Received Requests Section -->
                     <div class="requests-section">
                         <h2>Received Requests</h2>
                         <div class="requests-list" id="received-list"></div>
                     </div>
+                    <!-- Request Actions Section -->
                     <div class="action-section" id="div_connect_request">
                         <div class="action-card">
                             <h3>Request Actions</h3>
@@ -76,19 +94,21 @@
                 </div>
             </div>
 
+            <!-- Open Connections Tab -->
             <div id="OpenConnections" class="tab-content">
                 <div class="chat-grid">
-                    <!-- Active Connections -->
+                    <!-- Sidebar with Active Chats -->
                     <div class="connections-sidebar">
                         <h2>Active Chats</h2>
                         <div class="connections-list" id="connections-list"></div>
                     </div>
-
                     <!-- Chat Area -->
                     <div class="chat-area">
+                        <!-- Chat Messages -->
                         <div class="chat-messages" id="chat-msg"></div>
                         <div class="selected-friend" id="select-friend"></div>
                         
+                        <!-- Input Area for sending messages -->
                         <div class="chat-input-area">
                             <div class="typing-indicator" id="typing-indicator"></div>
                             <div class="input-group">
@@ -97,6 +117,7 @@
                             </div>
                         </div>
                         
+                        <!-- Actions for Chat Area -->
                         <div class="chat-actions">
                             <button id="clearHistory" class="clear-btn">Clear Chat History</button>
                         </div>
@@ -106,11 +127,14 @@
         </main>
     </div>
 
+    <!-- JavaScript to manage tabs and initialize user -->
     <script>
+        // User data passed from the backend
         var userData = {{ userData | tojson }};
         console.log('User data username =>', userData.Username);
         console.log('User data email =>', userData.Email);
 
+        // Function to switch between tabs
         function openTab(evt, tabName) {
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.classList.remove('active');
@@ -124,6 +148,7 @@
             evt.currentTarget.classList.add('active');
         }
 
+        // Auto-click on the first tab to initialize the view
         document.addEventListener("DOMContentLoaded", function() {
             document.querySelector('.tab-btn').click();
         });
