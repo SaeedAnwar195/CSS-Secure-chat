@@ -1,47 +1,37 @@
-/*
- * Socket Connection and Key Management
- * Initializes WebSocket connection and handles cryptographic key management.
- * Uses WebCrypto API for RSA encryption/decryption operations.
- */
 const socket = io({ autoConnect: false });
 let privateKey, publicKey;
 var clientKeys = JSON.parse(localStorage.getItem('clientKeys')) || {};
 var username, chatClient, chatClientPK;
 var isCurrentUser = true;
 
-/*
- * Local Storage Management Functions
- * Handles saving and loading of keys and client information
- * to maintain persistence across sessions.
- */
+// Function to save clientKeys to localStorage
 function saveClientKeys() {
     localStorage.setItem('clientKeys', JSON.stringify(clientKeys));
 }
 
+// Function to save publicKey to localStorage
 function savePublicKey() {
     localStorage.setItem('publicKey', publicKey);
 }
 
+// Function to load publicKey from localStorage
 function loadPublicKey() {
     publicKey = localStorage.getItem('publicKey');
 }
 
-/*
- * Private Key Management
- * Handles encryption, storage, and retrieval of private keys
- * using password-based encryption for additional security.
- */
+// Function to save privateKey to localStorage
 async function savePrivateKey() {
     const exportedPrivateKey = await window.crypto.subtle.exportKey("pkcs8", privateKey);
     const privateKeyBase64 = arrayBufferToBase64(exportedPrivateKey);
-    const encryptedPrivateKey = await encryptPrivateKey(privateKeyBase64, 'your-password');
+    const encryptedPrivateKey = await encryptPrivateKey(privateKeyBase64, 'your-password'); // Encrypt with a password
     localStorage.setItem('privateKey', encryptedPrivateKey);
 }
 
+// Function to load privateKey from localStorage
 async function loadPrivateKey() {
     const encryptedPrivateKey = localStorage.getItem('privateKey');
     if (encryptedPrivateKey) {
-        const privateKeyBase64 = await decryptPrivateKey(encryptedPrivateKey, 'your-password');
+        const privateKeyBase64 = await decryptPrivateKey(encryptedPrivateKey, 'your-password'); // Decrypt with a password
         const privateKeyArrayBuffer = base64ToArrayBuffer(privateKeyBase64);
         privateKey = await window.crypto.subtle.importKey(
             "pkcs8",
@@ -53,21 +43,13 @@ async function loadPrivateKey() {
             true,
             ["decrypt"]
         );
-        console.group('Private Key Management');
-        console.log('Private key successfully loaded from storage');
-        console.groupEnd();
+        console.log("Private key successfully loaded.");
     } else {
-        console.group('Private Key Management');
-        console.log('No private key found in storage');
-        console.groupEnd();
+        console.log("No private key found in localStorage.");
     }
 }
 
-/*
- * Private Key Encryption/Decryption
- * Uses AES-GCM for secure storage of private keys
- * with password-based key derivation.
- */
+// Function to encrypt the private key
 async function encryptPrivateKey(privateKeyBase64, password) {
     const passwordKey = await getPasswordKey(password);
     const iv = window.crypto.getRandomValues(new Uint8Array(12));
@@ -86,6 +68,7 @@ async function encryptPrivateKey(privateKeyBase64, password) {
     return arrayBufferToBase64(buff);
 }
 
+// Function to decrypt the private key
 async function decryptPrivateKey(encryptedPrivateKeyBase64, password) {
     const encryptedPrivateKeyBuff = base64ToArrayBuffer(encryptedPrivateKeyBase64);
     const iv = encryptedPrivateKeyBuff.slice(0, 12);
@@ -102,11 +85,7 @@ async function decryptPrivateKey(encryptedPrivateKeyBase64, password) {
     return new TextDecoder().decode(decryptedContent);
 }
 
-/*
- * Password Key Generation
- * Implements PBKDF2 key derivation for secure password-based encryption.
- * Uses SHA-256 with 100,000 iterations for enhanced security.
- */
+// Function to get a key from a password
 async function getPasswordKey(password) {
     const enc = new TextEncoder();
     const keyMaterial = await window.crypto.subtle.importKey(
@@ -119,7 +98,7 @@ async function getPasswordKey(password) {
     return window.crypto.subtle.deriveKey(
         {
             name: "PBKDF2",
-            salt: enc.encode("salt"),
+            salt: enc.encode("salt"), 
             iterations: 100000,
             hash: "SHA-256"
         },
@@ -130,71 +109,62 @@ async function getPasswordKey(password) {
     );
 }
 
-/*
- * Form Event Handlers
- * Manages form submissions and email functionality.
- * Prevents default form submission and creates mailto links.
- */
+// Function to handle form events
 document.addEventListener('DOMContentLoaded', function () {
-    console.group('Form Initialization');
-    console.log('Setting up form event handlers');
-    
+    console.log("Page loaded. Initializing form event handlers...");
+
+    // Select all forms
     const forms = document.querySelectorAll('form');
+
+    // Add event listener to each form
     forms.forEach(form => {
         form.addEventListener('submit', function (event) {
+            // Prevent default form submission, this is from the original form
             event.preventDefault();
+
+            // Serialize form data
             const formData = new FormData(form);
             const email = formData.get('email');
             const subject = encodeURIComponent(formData.get('subject'));
             const body = encodeURIComponent(formData.get('body'));
+
+            // Create mailto link
             const mailtoLink = `mailto:${email}?subject=${subject}&body=${body}`;
+
+            // Open mailto link
             window.location.href = mailtoLink;
+
+            // Reset the form values after submission
             form.reset();
         });
     });
-    
-    console.groupEnd();
 });
 
-/*
- * Main Application Event Handlers
- * Sets up event listeners for core application functionality including:
- * - Socket events
- * - User interactions
- * - Message handling
- * - Typing indicators
- */
 document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById("logout-btn").value = "Logout-" + userData.Username;
 
+    // Load privateKey and publicKey from localStorage
     await loadPrivateKey();
     loadPublicKey();
 
+    // Re-establish connection using data from localStorage
     if (Object.keys(clientKeys).length > 0) {
         loadAvailableFriends();
         loadConReceiveFriends();
         loadAccepetdFriends();
     }
 
-    /*
-     * Socket Event Handlers
-     * Manages real-time communication between users
-     */
     socket.on('email_send_notify', function (data) {
         try {
-            clientKeys[data['sender']].status = "con_recv";
+            clientKeys[data['sender']].status = "con_recv"
             saveClientKeys();
             loadConReceiveFriends();
             loadAvailableFriends();
-            
-            console.group('Email Notification');
-            console.log('Sender:', data['sender']);
-            console.log('Status: Connection request received');
-            console.groupEnd();
         } catch (error) {
-            console.error('Email notification error:', error);
+            console.error("Error message error:", error);
         }
-    });
+    })
+
 
     socket.on('email_reply_notify', function (data) {
         try {
@@ -202,51 +172,44 @@ document.addEventListener('DOMContentLoaded', async () => {
             saveClientKeys();
             loadAvailableFriends();
             loadConReceiveFriends();
-            
-            console.group('Reply Notification');
-            console.log('Sender:', data['sender']);
-            console.log('Status: Connection reply received');
-            console.groupEnd();
         } catch (error) {
-            console.error('Reply notification error:', error);
+            console.error("Error message error:", error);
         }
-    });
+    })
 
-    /*
-     * Message Handler
-     * Processes incoming messages, handles decryption,
-     * and manages message display and ordering.
-     */
     socket.on('message', async (data) => {
         try {
             let ul = document.getElementById("chat-msg");
             if (chatClient != data["sender"]) {
-                displaySelectFriendMessage(false);
+                displaySelectFriendMessage(false)
                 let li = document.createElement("li");
                 li.appendChild(document.createTextNode(`Chat with - ${data["sender"]}`));
                 li.classList.add("center_user");
                 ul.appendChild(li);
                 ul.scrollTop = ul.scrollHeight;
 
-                chatClient = data["sender"];
-                chatClientPK = clientKeys[data["sender"]].publicKey;
+                chatClient = data["sender"]
+                chatClientPK = clientKeys[data["sender"]].publicKey
             }
 
             isCurrentUser = false;
 
-            console.group('Message Processing');
-            console.log('Message from:', data["sender"]);
-            console.log('Processing encrypted content...');
+            console.log("Sender------------", data["sender"]);
+            console.log("Sender Encrypted Message------------", data["message"]);
 
             const decryptedMessage = await decryptMessage(privateKey, data["message"]);
-            clientKeys[data["sender"]].receivedMessageId += 1;
+            console.log("Sender Decrypted Message------------", decryptedMessage);
 
-            console.log('Message ID:', clientKeys[data["sender"]].receivedMessageId);
-            console.groupEnd();
+            clientKeys[data["sender"]].receivedMessageId = clientKeys[data["sender"]].receivedMessageId + 1
+            console.log("Received message id------------", clientKeys[data["sender"]].receivedMessageId);
 
             const hasColon = decryptedMessage.includes(':');
+
             if (hasColon) {
-                const [receivedMessageId, receivedMessage] = decryptedMessage.split(/:(.+)/);
+                const parts = decryptedMessage.split(/:(.+)/);
+
+                const receivedMessageId = parts[0];
+                const receivedMessage = parts[1];
 
                 if (receivedMessageId == clientKeys[data["sender"]].receivedMessageId) {
                     let li = document.createElement("li");
@@ -262,24 +225,23 @@ document.addEventListener('DOMContentLoaded', async () => {
                     selectFriend.appendChild(message);
                 }
             } else {
-                console.error('Invalid message format received');
+                console.log('Message format error...');
             }
+
+            
         } catch (error) {
-            console.error('Message processing error:', error);
+            console.error("Error during decryption:", error);
         }
     });
 
-    /*
-     * User and Connection Management Events
-     * Handles user list updates and connection status changes
-     */
     socket.on("allUsers", function (data) {
+        //console.log('All clients----->',data['allClients'])
         for (const [key, email] of Object.entries(data["allClients"])) {
-            console.group('User Processing');
-            console.log('Processing user:', key);
-            console.log('User email:', email);
-
+            console.log("-------start-------");
+            console.log('Client key ------ > ', key)
+            console.log('Username ------ > ', username)
             if ((!(key in clientKeys)) && (key != username)) {
+                console.log("All Users------>", key);
                 clientKeys[key] = {
                     'username': key,
                     'publicKey': '',
@@ -287,20 +249,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                     'status': 'available',
                     'sendMessageId': 0,
                     'receivedMessageId': 0
-                };
-                console.log('New user added to client keys');
+                }
             }
-            console.groupEnd();
+            console.log("-------end-------");
         }
-        
+        console.log('All users available ------ > ', clientKeys)
         saveClientKeys();
         loadAvailableFriends();
     });
 
     socket.on('logoutUsers', function (data) {
-        console.group('User Logout');
-        console.log('Logout user:', data['logoutUser']);
-        
+        var clientKey = data['logoutUser']
+        console.log('User logout========>', clientKey)
+        console.log('Client keys========>', clientKeys)
         if (chatClient == data['logoutUser']) {
             let ul = document.getElementById("chat-msg");
             let li = document.createElement("li");
@@ -308,52 +269,46 @@ document.addEventListener('DOMContentLoaded', async () => {
             li.classList.add("logout_user");
             ul.appendChild(li);
             ul.scrollTop = ul.scrollHeight;
+
             chatClient = null;
         }
-        
-        if (data['logoutUser'] in clientKeys) {
-            delete clientKeys[data['logoutUser']];
+        if (clientKey in clientKeys) {
+            delete clientKeys[clientKey];
+            console.log('Client keys after delete========>', clientKeys)
             saveClientKeys();
             loadAvailableFriends();
             loadConReceiveFriends();
             loadAccepetdFriends();
         }
-        console.groupEnd();
     });
 
     socket.on('logout_redirect', function () {
-        logout();
+        logout()
     });
 
     socket.on('error', function (errorData) {
-        console.error('Socket Error:', errorData.message);
+        console.log("Logout Error ------- ", errorData.message)
     });
 
-    /*
-     * Chat Interface Event Handlers
-     * Manages message sending, typing indicators, and chat history
-     */
     document.getElementById('send').onclick = async () => {
-        if (chatClient != null) {
+        if (chatClient != null){
             displaySelectFriendMessage(false);
             await sendMessage();
             socket.emit('stop_typing', { sender: username, recipient: chatClient });
         } else {
             displaySelectFriendMessage(true);
         }
+        
     };
 
     document.getElementById('clearHistory').onclick = async () => {
-        document.getElementById("chat-msg").innerHTML = "";
+        let ul = document.getElementById("chat-msg");
+        ul.innerHTML = ""
     };
 
-    /*
-     * Typing Indicator Handlers
-     * Manages real-time typing status updates
-     */
     document.getElementById("message-input").addEventListener("keypress", async function (event) {
         if (event.key === "Enter") {
-            if (chatClient != null) {
+            if (chatClient != null){
                 displaySelectFriendMessage(false);
                 await sendMessage();
                 socket.emit('stop_typing', { sender: username, recipient: chatClient });
@@ -361,100 +316,92 @@ document.addEventListener('DOMContentLoaded', async () => {
                 displaySelectFriendMessage(true);
             }
         } else {
-            socket.emit('typing', { sender: username, recipient: chatClient });
+            console.log("Keypress detected, sending typing event");
+        socket.emit('typing', { sender: username, recipient: chatClient });
         }
+        
     });
 
     document.getElementById("message-input").addEventListener("keyup", function (event) {
         if (event.key === "Enter") {
+            console.log("Enter key pressed, sending stop typing event");
             socket.emit('stop_typing', { sender: username, recipient: chatClient });
         }
     });
 
     document.getElementById("message-input").addEventListener("blur", function () {
+        console.log("Input lost focus, sending stop typing event");
         socket.emit('stop_typing', { sender: username, recipient: chatClient });
     });
 
-    /*
-     * Logout Handler
-     * Manages user logout and session cleanup
-     */
     document.getElementById('logout-btn').onclick = () => {
         socket.emit('logout', { user_name: username });
-        localStorage.clear();
+        localStorage.clear(); // Clear all local storage data
     };
 
-    /*
-     * Typing Status Event Handlers
-     * Updates UI based on typing indicators
-     */
     socket.on('typing', function (data) {
-        console.group('Typing Indicator');
-        console.log('User typing:', data.sender);
-        console.groupEnd();
-        
-        document.getElementById("typing-indicator").textContent = data.sender + " is typing...";
+        console.log("Received typing event from", data.sender);
+        const typingIndicator = document.getElementById("typing-indicator");
+        typingIndicator.textContent = data.sender + " is typing...";
     });
 
     socket.on('stop_typing', function (data) {
-        console.group('Typing Indicator');
-        console.log('User stopped typing:', data.sender);
-        console.groupEnd();
-        
-        document.getElementById("typing-indicator").textContent = "";
+        console.log("Received stop typing event from", data.sender);
+        const typingIndicator = document.getElementById("typing-indicator");
+        typingIndicator.textContent = "";
     });
 });
 
-/*
- * User Initialization
- * Sets up user session and cryptographic keys
- */
+
 async function initiateUser() {
     try {
         username = userData.Username;
-        console.group('User Initialization');
-        console.log('Initializing user:', username);
+        console.log("Initiate user===============================>>", username)
 
+        // Check if private key exists in localStorage
         const privateKeyBase64 = localStorage.getItem('privateKey');
         if (privateKeyBase64) {
             await loadPrivateKey();
-            console.log('Using existing private key');
+            console.log("Using existing private key.");
         } else {
             publicKey = await generateRSAKeyPair();
-            console.log('Generated new key pair');
+            console.log("Generated new key pair.");
         }
 
+        // Load publicKey from localStorage
         loadPublicKey();
+
         socket.connect();
-        
+        console.log('Username------->', userData.Username)
+        console.log('Email------->', userData.Email)
         socket.on("connect", function () {
-            socket.emit('user_join', { 
-                recipient: userData.Username, 
-                email: userData.Email 
-            });
+            // socket.emit('user_join', { recipient: userData.Username, publicKey: clientPublicKey });
+            socket.emit('user_join', { recipient: userData.Username, email: userData.Email });
         });
-        
-        console.groupEnd();
+
+
+        // document.getElementById("chat_header_text").textContent = `CryptoGram [${userData.Username}]`;
+
     } catch (error) {
-        console.error('User initialization error:', error);
+        console.error("Error initiating user:", error);
     }
 }
 
-/*
- * Friend List Management Functions
- * Handles displaying and updating friend lists
+/**
+ * Function to load the chat list
  */
 function loadAvailableFriends() {
     var friendsList = document.getElementById("friends-list");
     friendsList.innerHTML = "";
 
     for (const [key, user] of Object.entries(clientKeys)) {
-        console.group('Friend Processing');
-        console.log('Username:', user['username']);
-        console.log('Email:', user['email']);
-        console.log('Status:', user['status']);
+        console.log("user==" + user['username']);
+        console.log("user==" + user['email']);
+        console.log("user==" + user['status']);
 
         let li = document.createElement("li");
+
+        console.log("user['status'] available=====" + user['status']);
 
         if (user['status'] == 'con_sent') {
             li.innerHTML = `
@@ -463,7 +410,8 @@ function loadAvailableFriends() {
                 <div class="last-active" id="last-active-${key}"></div>
                 <div class="action"><input type="button" style="background-color:rgb(196, 128, 32);" value="Invitation Sent" disabled></div>
             `;
-        } else if (user['status'] == 'available') {
+        } else if (user['status'] == 'available') {            
+            console.log("Public key---------------> "+publicKey);
             li.innerHTML = `
                 <div class="status-indicator"></div>
                 <div class="username">${key}</div>
@@ -473,26 +421,24 @@ function loadAvailableFriends() {
         }
 
         friendsList.appendChild(li);
-        console.groupEnd();
     }
 }
 
-/*
- * Connection Request Management
- * Handles pending connections and friend requests
+/**
+ * Function to load the chat list
  */
 function loadConReceiveFriends() {
     var friendsList = document.getElementById("received-list");
     friendsList.innerHTML = "";
 
     for (const [key, user] of Object.entries(clientKeys)) {
-        console.group('Connection Request Processing');
-        console.log('Processing user:', user['username']);
-        console.log('Status:', user['status']);
-        console.log('Public Key Status:', user['publicKey'] ? 'Available' : 'Not Available');
+        console.log("user==" + user['username']);
+        console.log("user==" + user['email']);
+        console.log("user==" + user['status']);
 
         let li = document.createElement("li");
 
+        console.log("user['status'] loadConReceiveFriends=====" + user['status']);
         if ((user['status'] == 'con_recv' || user['status'] == 'con_reply_recv') && user['publicKey'] == "") {
             li.innerHTML = `
                 <div class="status-indicator"></div>
@@ -501,31 +447,36 @@ function loadConReceiveFriends() {
                 <div class="action"><input type="button" name="add_friend" value="Add ParsePhase" onclick='loadReply(${JSON.stringify(user)}, "${publicKey}")'></div>
             `;
         } else if (user['status'] == 'con_recv' && user['publicKey'] != "") {
+            console.log("con_recv:Public key---------------> "+publicKey);
             li.innerHTML = `
                 <div class="status-indicator"></div>
                 <div class="username">${key}</div>
                 <div class="last-active" id="last-active-${key}"></div>
                 <div class="action"><input type="button" name="add_friend" value="Send Confirmation" style="background-color:rgb(196, 128, 32);" onclick='loadReply(${JSON.stringify(user)}, "${publicKey}")'></div>
             `;
+
         }
 
         friendsList.appendChild(li);
-        console.groupEnd();
     }
 }
 
-/*
- * Parse Phase Management
- * Handles public key parsing and verification
+/**
+ * onclick method for button click 
+ * @param {*} friendObj 
  */
 function OnAddParsePhaseClick(friendObj) {
-    const parsePhase = document.getElementById("body_parsephase").value;
-    console.group('Parse Phase Processing');
-    console.log('Processing parse phase for:', friendObj.username);
-    
+    //console.log("OnAddParsePhaseClick----:");
+    var parsePhase = document.getElementById("body_parsephase").value;
+    console.log("OnAddParsePhaseClick-parsePhase=", parsePhase);
+
     const hasColon = parsePhase.includes(':');
+
     if (hasColon) {
-        const [parsePhaseUser, parsePhasePublicKey] = parsePhase.split(/:(.+)/);
+        const parts = parsePhase.split(/:(.+)/);
+
+        const parsePhaseUser = parts[0];
+        const parsePhasePublicKey = parts[1];
 
         if (parsePhaseUser == friendObj.username) {
             clientKeys[friendObj.username].publicKey = parsePhasePublicKey;
@@ -534,32 +485,31 @@ function OnAddParsePhaseClick(friendObj) {
             saveClientKeys();
             loadConReceiveFriends();
             loadAccepetdFriends();
-            console.log('Public key successfully added');
         } else {
-            publicKeyLoadForm(friendObj, true, 'Please Enter Correct Public Key');
-            console.log('Public key user mismatch');
+            publicKeyLoadForm(friendObj, true, 'Please Enter Correct Public Key')
         }
     } else {
-        publicKeyLoadForm(friendObj, true, 'Please Enter Correct Public Key');
-        console.log('Invalid public key format');
+        publicKeyLoadForm(friendObj, true, 'Please Enter Correct Public Key')
     }
-    console.groupEnd();
 }
 
-/*
- * Accepted Friends Management
- * Handles display and interaction with connected friends
+
+/**
+ * Function to load the chat list
  */
 function loadAccepetdFriends() {
     var friendsList = document.getElementById("connections-list");
     friendsList.innerHTML = "";
 
     for (const [key, user] of Object.entries(clientKeys)) {
+        console.log("user==" + user['username']);
+        console.log("user==" + user['email']);
+        console.log("user==" + user['status']);
+
+        let li = document.createElement("li");
+
+        console.log("user['status'] loadAccepetdFriends=====" + user['status']);
         if (user['status'] == 'accepted') {
-            console.group('Accepted Friend Processing');
-            console.log('Adding accepted friend:', key);
-            
-            let li = document.createElement("li");
             li.innerHTML = `
                 <div class="status-indicator"></div>
                 <div class="username">${key}</div>
@@ -567,77 +517,257 @@ function loadAccepetdFriends() {
             `;
 
             li.addEventListener("click", () => {
-                if (chatClient != key) {
+                if (chatClient != key){
                     chatClient = key;
-                    chatClientPK = user.publicKey;
-                    displaySelectFriendMessage(false);
+                    chatClientPK = user.publicKey
+                    displaySelectFriendMessage(false)
 
+                    
                     let ul = document.getElementById("chat-msg");
                     let li = document.createElement("li");
                     li.appendChild(document.createTextNode(`Chat with - ${chatClient}`));
                     li.classList.add("center_user");
                     ul.appendChild(li);
                     ul.scrollTop = ul.scrollHeight;
-                    
-                    console.log('Chat initiated with:', key);
                 }
             });
-
-            friendsList.appendChild(li);
-            console.groupEnd();
         }
+
+        friendsList.appendChild(li);
     }
 }
 
-/*
- * Email Client Window Management
- * Handles email-based connection requests and notifications
+/**
+ * Button click function for sending connection request via an email
+ * this will open the email client for sending the email.
  */
-function openEmailClientWindow(obj, publicKey) {    
-    if(obj.status == 'available') {
+function OnRequestSend(obj, status) {
+
+    console.log('Status OnRequestSend------->', status)
+    if (status == "con_sent") {
         clientKeys[obj.username].status = "con_sent";
         saveClientKeys();
-        socket.emit('send_email_notification', { 
-            recipient_name: obj.username, 
-            notification: "Public Key Request Send" 
-        });
+        socket.emit('send_email_notification', { recipient_name: obj.username, notification: "Public Key Request Send" });
+        loadAvailableFriends();
+    } else if (status == "con_recv") {
+        clientKeys[obj.username].status = "accepted"
+        saveClientKeys();
+        socket.emit('reply_email_notification', { recipient_name: obj.username, notification: "Public Key Reply Send" });
+        loadConReceiveFriends();
+        loadAccepetdFriends();
+    }
+
+    document.getElementById('email_request_form').innerHTML = '';
+    document.getElementById('email_reply_form').innerHTML = '';
+}
+
+/**
+ * Function to open the email sending window.
+ */
+function openEmailClientWindow(obj, publicKey) {    
+
+    if(obj.status == 'available')
+    {
+        // execute pre-processing
+        clientKeys[obj.username].status = "con_sent";
+        saveClientKeys();
+        socket.emit('send_email_notification', { recipient_name: obj.username, notification: "Public Key Request Send" });
         loadAvailableFriends();
     }
     
     const emailWindow = window.open('', '_blank', 'width=600,height=400');    
-    const htmlContent = `/* ... HTML content for email window ... */`;
+    // Define the HTML content for the new window to send the email request with invitation
+    const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Send Gobuzz Chat Invitation</title>
+            <style>
+                body {
+                font-family: Arial, sans-serif;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                background: linear-gradient(135deg, #72EDF2 10%, #5151E5 100%);
+                margin: 0;
+
+                .email-form-container {
+                    max-width: 500px;
+                    margin: 20px auto;
+                    padding: 20px;
+                    border: 1px solid #ccc;
+                    border-radius: 5px;
+                    background-color: #f9f9f9;
+                }
+
+                .email-form-container h1 {
+                    text-align: center;
+                    margin-bottom: 20px;
+                    color: #333;
+                }
+
+                .email-form-container form {
+                    display: flex;
+                    flex-direction: column;
+                }
+
+                .email-form-container label {
+                    margin-bottom: 5px;
+                    font-weight: normal;
+                    color: #555;
+                    font-size: 15px;
+                }
+
+                .email-form-container input[type="email"],
+                .email-form-container input[type="text"],
+                .email-form-container textarea {
+                    width: 100%;
+                    padding: 5px 5px 5px 5px;
+                    margin-bottom: 1px;
+                    border: 1px solid #ccc;
+                    border-radius: 4px;
+                    font-size: 16px;
+                    color: #333;
+                }
+
+                .email-form-container input[type="email"]:focus,
+                .email-form-container input[type="text"]:focus,
+                .email-form-container textarea:focus {
+                    border-color: #007bff;
+                    outline: none;
+                }
+
+                .email-form-container textarea {
+                    height: 100px;
+                    resize: vertical;
+                }
+
+                .email-form-container button {
+                    margin-top: 5px;
+                    padding: 10px 15px;
+                    font-size: 16px;
+                    color: #fff;
+                    background-color: #007bff;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    transition: background-color 0.3s ease;
+                }
+
+                .email-form-container button:hover {
+                    background-color: #0056b3;
+                }
+            }
+            </style>
+        </head>
+        <body>
+            <div class="email-form-container">
+                <form id="emailForm">
+                    <label for="email">To:</label>
+                    <input type="email" id="email" name="email" value="${obj.email}" required>
+                    <label for="subject">Subject:</label>
+                    <input type="text" id="subject" name="subject" value="GoBuzz Chat Invitation" required>
+                    <label for="body">Body:</label>
+                    <textarea id="body" name="body" required>${publicKey}</textarea>  
+                    <button type="submit">Send Request</button>
+                </form>
+            </div>
+        </body>
+        </html>
+    `;
     
     emailWindow.document.write(htmlContent);
     emailWindow.document.close();
 
-    const scriptContent = `/* ... Script content for email window ... */`;
+    // Inject the script to handle form submission after the HTML is written
+    const scriptContent = `
+        document.getElementById('emailForm').addEventListener('submit', function(event) {
+            event.preventDefault(); // Prevent the form from submitting the traditional way
+            const email = document.getElementById('email').value;
+            const subject = document.getElementById('subject').value;
+            const body = document.getElementById('body').value;
+
+            if (email && subject && body) {
+                const mailtoLink = 'mailto:' + email + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+                //window.opener.notifyEmailSent(email);
+                window.open(mailtoLink, '_blank'); // Open the email client
+                window.close(); // Close the email client window
+            } else {
+                alert('All fields are required.');
+            }
+        });
+    `;
     
     const script = emailWindow.document.createElement('script');
     script.textContent = scriptContent;
     emailWindow.document.body.appendChild(script);
 }
 
-/*
- * Message Handling Functions
- * Manages message encryption, sending, and display
+/**
+ * Function to load the email request
  */
-async function sendMessage() {
-    clientKeys[chatClient].sendMessageId += 1;
-    console.group('Message Sending');
-    console.log('Sending message to:', chatClient);
-    console.log('Message ID:', clientKeys[chatClient].sendMessageId);
+function loadRequest(obj, publicKey) {
+    const formContent = `
+        <div class="email-form-container">
+            <label for="email">Email:</label>
+            <input type="email" id="email" name="email" value="${obj.email}" required>            
+            <label for="subject">Subject:</label>
+            <input type="text" id="subject" name="subject" value="GOBUZZ Public Key For - ${obj.username}" required>            
+            <label for="body">Body:</label>
+            <textarea id="body" name="body" required>${publicKey}</textarea>            
+            <button type="button" onclick='OnRequestSend(${JSON.stringify(obj)}, "con_sent")'>Request To Connect</button>
+        </div>
+    `;
+    document.getElementById('email_request_form').innerHTML = formContent;
+}
 
+/**
+ * Function to load the email request
+ */
+function loadReply(obj, publicKey) {
+    let formContent;
+
+    if (clientKeys[obj.username].status == "con_recv" && clientKeys[obj.username].publicKey != "") {
+        clientKeys[obj.username].status = "accepted"
+        saveClientKeys();
+        socket.emit('reply_email_notification', { recipient_name: obj.username, notification: "Public Key Reply Send" });
+        loadConReceiveFriends();
+        loadAccepetdFriends();
+        openEmailClientWindow(obj, publicKey);
+    } else {
+        publicKeyLoadForm(obj, false, 'nil');
+    }
+}
+
+function publicKeyLoadForm(obj, showMsg, msg = '') {
+    const conditionalP = showMsg ? `<p style="color: red;">${msg}</p>` : '';
+
+    formContent = `
+        <div class="email-form-container">
+            <label for="body_parsephase">ParsePhase:</label>
+            <textarea id="body_parsephase" name="body" placeholder="Enter the Public Key received via the email. Please check email and enter the Public Key" required></textarea>
+            ${conditionalP}
+            <button type="button" name="connect" onclick='OnAddParsePhaseClick(${JSON.stringify(obj)})'>Add ParsePhase</button>
+        </div>
+        `;
+    if (clientKeys[obj.username].status == "con_reply_recv") {
+        clientKeys[obj.username].status = "accepted";
+        saveClientKeys();
+    }
+    document.getElementById('email_reply_form').innerHTML = formContent;
+}
+
+async function sendMessage() {
+    clientKeys[chatClient].sendMessageId = clientKeys[chatClient].sendMessageId + 1
+    console.log("Send message number----------->", clientKeys[chatClient].sendMessageId)
     const clientMessageText = document.getElementById('message-input').value;
     const clientMessage = clientKeys[chatClient].sendMessageId + ':' + clientMessageText;
-    
-    const encryptedMessage = await encryptMessage(chatClientPK, clientMessage);
-
+    console.log("Message before encrypt-----------", clientMessage)
+    const encryptedMessage = await encryptMessage(chatClientPK, clientMessage)
+    console.log("Message after encrypt-----------", encryptedMessage)
     if (chatClient && clientMessage.trim() !== "") {
         document.getElementById("message-input").value = "";
-        socket.emit('message', { 
-            recipient_name: chatClient, 
-            message: encryptedMessage 
-        });
+        socket.emit('message', { recipient_name: chatClient, message: encryptedMessage });
 
         isCurrentUser = true;
         let ul = document.getElementById("chat-msg");
@@ -646,22 +776,14 @@ async function sendMessage() {
         li.classList.add("right-align");
         ul.appendChild(li);
         ul.scrollTop = ul.scrollHeight;
-        
-        console.log('Message sent successfully');
+    } else if (clientMessage.trim() === "") {
+        console.error('Empty message cannot be sent');
     } else {
-        console.error(clientMessage.trim() === '' ? 'Empty message' : 'No chat client selected');
+        console.error('No chat client selected');
     }
-    console.groupEnd();
 }
 
-/*
- * Cryptographic Operations
- * Handles key generation, encryption, and decryption
- */
 async function generateRSAKeyPair() {
-    console.group('RSA Key Generation');
-    console.log('Generating new RSA key pair');
-    
     const keyPair = await window.crypto.subtle.generateKey(
         {
             name: "RSA-OAEP",
@@ -676,29 +798,36 @@ async function generateRSAKeyPair() {
     const publicKeyArrayBuffer = await window.crypto.subtle.exportKey("spki", keyPair.publicKey);
     const publicKeyBase64 = username + ':' + arrayBufferToBase64(publicKeyArrayBuffer);
 
+
+    console.log("Generated Public Key (Base64):", publicKeyBase64);
     privateKey = keyPair.privateKey;
+
+    // Save the private key to localStorage
     await savePrivateKey();
-    
+
+    // Save the public key to localStorage
     publicKey = publicKeyBase64;
     savePublicKey();
-    
-    console.log('Key pair generated successfully');
-    console.groupEnd();
-    
+
     return publicKeyBase64;
 }
 
-/*
- * Message Encryption/Decryption Functions
- * Handles secure message exchange
- */
+async function generateSHA256Hash(message) {
+    const msgBuffer = new TextEncoder().encode(message);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return hashHex;
+}
+
 async function encryptMessage(publicKeyBase64, message) {
     try {
         if (typeof publicKeyBase64 !== 'string' || !isBase64(publicKeyBase64)) {
-            throw new Error("Invalid public key format");
+            throw new Error("Public key is not a valid Base64 string.");
         }
 
         const publicKeyArrayBuffer = base64ToArrayBuffer(publicKeyBase64);
+
         const publicKey = await window.crypto.subtle.importKey(
             "spki",
             publicKeyArrayBuffer,
@@ -711,51 +840,54 @@ async function encryptMessage(publicKeyBase64, message) {
         );
 
         const encodedMessage = new TextEncoder().encode(message);
+
         const encryptedMessage = await window.crypto.subtle.encrypt(
-            { name: "RSA-OAEP" },
+            {
+                name: "RSA-OAEP"
+            },
             publicKey,
             encodedMessage
         );
 
         return arrayBufferToBase64(encryptedMessage);
     } catch (error) {
-        console.error('Encryption error:', error.message);
+        console.error("Error during encryption:", error.message);
         throw error;
     }
 }
 
+
 async function decryptMessage(privateKey, encryptedMessage) {
     try {
         const decryptedMessage = await window.crypto.subtle.decrypt(
-            { name: "RSA-OAEP" },
+            {
+                name: "RSA-OAEP"
+            },
             privateKey,
             base64ToArrayBuffer(encryptedMessage)
         );
         return new TextDecoder().decode(decryptedMessage);
     } catch (error) {
-        console.error('Decryption error:', error.message);
+        console.error("Error during decryption:", error.message);
         throw error;
     }
 }
 
-/*
- * Utility Functions
- * Handles base64 conversion and validation
- */
 function base64ToArrayBuffer(base64) {
     try {
         if (!isBase64(base64)) {
-            throw new Error("Invalid Base64 string");
+            throw new Error("Invalid Base64 string.");
         }
 
         const binaryString = window.atob(base64);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
             bytes[i] = binaryString.charCodeAt(i);
         }
         return bytes.buffer;
     } catch (error) {
-        console.error('Base64 conversion error:', error.message);
+        console.error("Failed to convert Base64 to ArrayBuffer:", error.message);
         throw error;
     }
 }
@@ -763,7 +895,8 @@ function base64ToArrayBuffer(base64) {
 function arrayBufferToBase64(buffer) {
     let binary = '';
     const bytes = new Uint8Array(buffer);
-    for (let i = 0; i < bytes.byteLength; i++) {
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
         binary += String.fromCharCode(bytes[i]);
     }
     return window.btoa(binary);
@@ -774,14 +907,11 @@ function isBase64(str) {
     return base64Pattern.test(str);
 }
 
-/*
- * UI Helper Functions
- * Manages user interface elements and feedback
- */
 function displaySelectFriendMessage(visibility) {
+
     const selectFriend = document.getElementById('select-friend');
     if (visibility) {
-        if (!selectFriend.querySelector('p')) {
+        if (!selectFriend.querySelector('p')) { // Check if the message is not already displayed
             const message = document.createElement('p');
             message.style.color = 'red';
             message.textContent = 'Please select a friend to chat';
@@ -793,27 +923,54 @@ function displaySelectFriendMessage(visibility) {
             selectFriend.removeChild(message);
         }
     }
+    
 }
 
-/*
- * Session Management Functions
- * Handles user session and logout operations
- */
+function confirmLogout() {
+
+    const modal = document.getElementById("confirmationModal");
+    modal.style.display = "block";
+
+    const confirmYes = document.getElementById("confirmYes");
+    const confirmNo = document.getElementById("confirmNo");
+
+    confirmYes.onclick = null;
+    confirmNo.onclick = null;
+
+    confirmYes.addEventListener('click', function () {
+        socket.emit('logout', { user_name: username });
+    });
+
+    confirmNo.addEventListener('click', function () {
+        modal.style.display = "none";
+    });
+
+    const closeBtn = document.getElementsByClassName("close")[0];
+    closeBtn.onclick = function () {
+        modal.style.display = "none";
+    };
+
+    window.onclick = function (event) {
+        if (event.target === modal) {
+            modal.style.display = "none";
+        }
+    };
+
+
+}
+
 function logout() {
     fetch('/logout', {
         method: 'GET',
         credentials: 'same-origin'
-    })
-    .then(response => {
+    }).then(response => {
         if (response.ok) {
-            localStorage.clear();
+            localStorage.clear(); // Clear all local storage data
             window.location.href = '/';
-            console.log('Logout successful');
         } else {
-            console.error('Logout failed');
+            console.error("Logout failed");
         }
-    })
-    .catch(error => {
-        console.error('Logout error:', error);
+    }).catch(error => {
+        console.error("Logout error:", error);
     });
 }

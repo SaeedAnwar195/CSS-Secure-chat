@@ -360,3 +360,18 @@ def internal_error(error):
     app_logger.error(f"500 error: {str(error)}")
     db.session.rollback()
     return render_template('errors/500.html'), 500
+
+@bp.route('/send-key-email', methods=['POST'])
+def send_key_email():
+    data = request.json
+    try:
+        msg = Message(
+            'Cryptogram Connection Key',
+            sender=current_app.config['MAIL_USERNAME'],
+            recipients=[data['email']]
+        )
+        msg.body = f"Here is the connection key for Cryptogram:\n\n{data['key']}"
+        mail.send(msg)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
