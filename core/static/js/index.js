@@ -1,209 +1,136 @@
-const socket = io({ autoConnect: false }); // Initialize a socket connection with autoConnect set to false.
-let privateKey, publicKey; // Declare variables for the user's RSA private and public keys.
+const socket = io({ autoConnect: false }); // Initialize a socket connection but prevent it from automatically connecting until explicitly triggered.
+let privateKey, publicKey; // Declare variables to hold the RSA private and public keys.
+var clientKeys = JSON.parse(localStorage.getItem('clientKeys')) || {}; // Retrieve previously saved client keys from localStorage or initialize an empty object if no data exists.
+var username, chatClient, chatClientPK; // Define variables for the current username, the chat client, and the public key of the chat client.
+var isCurrentUser = true; // A flag to track whether the current user is active or sending messages in a conversation.
 
-var clientKeys = JSON.parse(localStorage.getItem('clientKeys')) || {}; // Retrieve client keys from localStorage or initialize an empty object.
-var username, chatClient, chatClientPK; // Declare variables for the current user and chat client data.
-var isCurrentUser = true; // Flag to indicate whether the current user is active.
-
-// Function to save client keys to localStorage
+// Define a function to save client keys to localStorage for persistent storage. The `clientKeys` object is serialized to a JSON string and stored.
 function saveClientKeys() {
-    localStorage.setItem('clientKeys', JSON.stringify(clientKeys)); // Store the clientKeys object as a JSON string in localStorage.
+    localStorage.setItem('clientKeys', JSON.stringify(clientKeys));
 }
 
-// Function to save the public key to localStorage
+// Define a function to save the public key to localStorage for later retrieval. The `publicKey` variable is stored as a string.
 function savePublicKey() {
-    localStorage.setItem('publicKey', publicKey); // Save the public key as a string in localStorage.
+    localStorage.setItem('publicKey', publicKey);
 }
 
-// Function to load the public key from localStorage
+// Define a function to load the public key from localStorage. The value is retrieved and assigned to the `publicKey` variable.
 function loadPublicKey() {
-    publicKey = localStorage.getItem('publicKey'); // Retrieve the public key from localStorage.
+    publicKey = localStorage.getItem('publicKey');
 }
 
-// Function to save the private key to localStorage securely
+// Define an asynchronous function to save the private key to localStorage securely. The private key is exported in PKCS8 format, converted to a Base64 string, encrypted with a password, and then stored in localStorage.
 async function savePrivateKey() {
-    const exportedPrivateKey = await window.crypto.subtle.exportKey("pkcs8", privateKey); // Export the private key in PKCS8 format.
-    const privateKeyBase64 = arrayBufferToBase64(exportedPrivateKey); // Convert the private key to a Base64 string.
-    const encryptedPrivateKey = await encryptPrivateKey(privateKeyBase64, 'your-password'); // Encrypt the private key with a password.
-    localStorage.setItem('privateKey', encryptedPrivateKey); // Save the encrypted private key in localStorage.
+    const exportedPrivateKey = await window.crypto.subtle.exportKey("pkcs8", privateKey);
+    const privateKeyBase64 = arrayBufferToBase64(exportedPrivateKey);
+    const encryptedPrivateKey = await encryptPrivateKey(privateKeyBase64, 'your-password'); // Encrypt the private key using a password.
+    localStorage.setItem('privateKey', encryptedPrivateKey);
 }
 
-// Function to load the private key from localStorage securely
+// Define an asynchronous function to load the private key from localStorage securely. The encrypted private key is retrieved, decrypted with a password, and imported back into the Web Crypto API as a usable key object.
 async function loadPrivateKey() {
     const encryptedPrivateKey = localStorage.getItem('privateKey'); // Retrieve the encrypted private key from localStorage.
     if (encryptedPrivateKey) {
-        const privateKeyBase64 = await decryptPrivateKey(encryptedPrivateKey, 'your-password'); // Decrypt the private key using the password.
+        const privateKeyBase64 = await decryptPrivateKey(encryptedPrivateKey, 'your-password'); // Decrypt the private key using the provided password.
         const privateKeyArrayBuffer = base64ToArrayBuffer(privateKeyBase64); // Convert the Base64 string to an ArrayBuffer.
         privateKey = await window.crypto.subtle.importKey(
             "pkcs8",
             privateKeyArrayBuffer,
             {
                 name: "RSA-OAEP",
-                hash: "SHA-256" // Use SHA-256 as the hashing algorithm.
+                hash: "SHA-256"
             },
             true,
-            ["decrypt"] // Grant decryption permissions to the key.
+            ["decrypt"] // Specify the usage of the private key for decryption purposes.
         );
-        console.log("Private key successfully loaded."); // Log success message.
+        console.log("Private key successfully loaded.");
     } else {
-        console.log("No private key found in localStorage."); // Log message if no key is found.
+        console.log("No private key found in localStorage."); // Log a message if no private key is found in localStorage.
     }
 }
 
-// Function to encrypt the private key with AES-GCM
+// Define an asynchronous function to encrypt the private key using AES-GCM. The private key in Base64 format is encrypted with a derived password-based key and returned as a Base64 string.
 async function encryptPrivateKey(privateKeyBase64, password) {
-    const passwordKey = await getPasswordKey(password); // Derive a key from the provided password.
-    const iv = window.crypto.getRandomValues(new Uint8Array(12)); // Generate a random initialization vector (IV).
+    const passwordKey = await getPasswordKey(password); // Derive a cryptographic key from the provided password.
+    const iv = window.crypto.getRandomValues(new Uint8Array(12)); // Generate a random initialization vector (IV) for the encryption.
     const encryptedContent = await window.crypto.subtle.encrypt(
         {
             name: "AES-GCM",
-            iv: iv // Use the IV for encryption.
+            iv: iv
         },
         passwordKey,
-        new TextEncoder().encode(privateKeyBase64) // Encode the private key to a Uint8Array.
+        new TextEncoder().encode(privateKeyBase64) // Encode the private key as a Uint8Array for encryption.
     );
     const encryptedContentArr = new Uint8Array(encryptedContent); // Convert the encrypted content to a Uint8Array.
-    const buff = new Uint8Array(iv.byteLength + encryptedContentArr.byteLength); // Concatenate the IV and encrypted content.
-    buff.set(iv, 0);
-    buff.set(encryptedContentArr, iv.byteLength);
-    return arrayBufferToBase64(buff); // Convert the result to a Base64 string.
+    const buff = new Uint8Array(iv.byteLength + encryptedContentArr.byteLength); // Create a buffer to hold both the IV and the encrypted content.
+    buff.set(iv, 0); // Append the IV at the beginning of the buffer.
+    buff.set(encryptedContentArr, iv.byteLength); // Append the encrypted content after the IV.
+    return arrayBufferToBase64(buff); // Convert the combined buffer to a Base64 string and return it.
 }
 
-// Function to decrypt the private key with AES-GCM
+// Define an asynchronous function to decrypt the private key using AES-GCM. The function extracts the IV and encrypted content from the provided Base64 string, decrypts it using a password-derived key, and returns the decrypted private key in Base64 format.
 async function decryptPrivateKey(encryptedPrivateKeyBase64, password) {
     const encryptedPrivateKeyBuff = base64ToArrayBuffer(encryptedPrivateKeyBase64); // Convert the Base64 string to an ArrayBuffer.
-    const iv = encryptedPrivateKeyBuff.slice(0, 12); // Extract the IV from the buffer.
-    const data = encryptedPrivateKeyBuff.slice(12); // Extract the encrypted content.
-    const passwordKey = await getPasswordKey(password); // Derive a key from the provided password.
+    const iv = encryptedPrivateKeyBuff.slice(0, 12); // Extract the IV from the first 12 bytes of the buffer.
+    const data = encryptedPrivateKeyBuff.slice(12); // Extract the encrypted content starting from the 13th byte.
+    const passwordKey = await getPasswordKey(password); // Derive a cryptographic key from the provided password.
     const decryptedContent = await window.crypto.subtle.decrypt(
         {
             name: "AES-GCM",
-            iv: iv // Use the IV for decryption.
+            iv: iv
         },
         passwordKey,
-        data // Decrypt the data.
+        data // Use the encrypted content for decryption.
     );
-    return new TextDecoder().decode(decryptedContent); // Decode and return the decrypted content.
+    return new TextDecoder().decode(decryptedContent); // Decode the decrypted content into a string and return it.
 }
 
-// Function to derive a key from a password
+// Define an asynchronous function to derive a cryptographic key from a password using PBKDF2. The function uses a predefined salt, iteration count, and hash algorithm to produce a 256-bit AES key.
 async function getPasswordKey(password) {
-    const enc = new TextEncoder(); // Create a TextEncoder instance.
+    const enc = new TextEncoder(); // Create a TextEncoder to encode the password into a Uint8Array.
     const keyMaterial = await window.crypto.subtle.importKey(
         "raw",
-        enc.encode(password), // Encode the password to a Uint8Array.
-        { name: "PBKDF2" }, // Use PBKDF2 for key derivation.
+        enc.encode(password),
+        { name: "PBKDF2" }, // Specify PBKDF2 as the key derivation algorithm.
         false,
         ["deriveKey"]
     );
     return window.crypto.subtle.deriveKey(
         {
             name: "PBKDF2",
-            salt: enc.encode("salt"), // Use a fixed salt for derivation.
-            iterations: 100000, // Set the number of iterations.
-            hash: "SHA-256" // Use SHA-256 as the hashing algorithm.
+            salt: enc.encode("salt"), // Use a predefined salt for key derivation.
+            iterations: 100000, // Specify the number of iterations for key strengthening.
+            hash: "SHA-256" // Use SHA-256 as the hash algorithm for PBKDF2.
         },
         keyMaterial,
-        { name: "AES-GCM", length: 256 }, // Derive a 256-bit AES key.
+        { name: "AES-GCM", length: 256 }, // Define the derived key as a 256-bit AES key for GCM mode.
         false,
-        ["encrypt", "decrypt"] // Grant encryption and decryption permissions.
+        ["encrypt", "decrypt"] // Grant the derived key permissions for encryption and decryption.
     );
 }
 
-// Function to handle form submission events
+// Add an event listener to the document that runs when the DOM content is fully loaded. This function sets up form handling for all forms on the page.
 document.addEventListener('DOMContentLoaded', function () {
-    console.log("Page loaded. Initializing form event handlers..."); // Log page load event.
+    console.log("Page loaded. Initializing form event handlers...");
 
-    // Select all forms on the page
+    // Select all forms on the page and iterate over each form.
     const forms = document.querySelectorAll('form');
 
-    // Add a submit event listener to each form
+    // Add a submit event listener to each form to handle custom submission behavior.
     forms.forEach(form => {
         form.addEventListener('submit', function (event) {
-            event.preventDefault(); // Prevent default form submission.
+            event.preventDefault(); // Prevent the default form submission behavior, allowing custom handling.
 
-            const formData = new FormData(form); // Serialize form data.
-            const email = formData.get('email'); // Get the email value.
-            const subject = encodeURIComponent(formData.get('subject')); // Encode the subject.
-            const body = encodeURIComponent(formData.get('body')); // Encode the body.
+            const formData = new FormData(form); // Serialize the form data into a FormData object.
+            const email = formData.get('email'); // Extract the email field value from the form.
+            const subject = encodeURIComponent(formData.get('subject')); // Encode the subject field value for use in a URL.
+            const body = encodeURIComponent(formData.get('body')); // Encode the body field value for use in a URL.
 
-            const mailtoLink = `mailto:${email}?subject=${subject}&body=${body}`; // Create a mailto link.
-            window.location.href = mailtoLink; // Open the mailto link.
-            form.reset(); // Reset the form fields.
+            const mailtoLink = `mailto:${email}?subject=${subject}&body=${body}`; // Construct a mailto link with the form data.
+
+            window.location.href = mailtoLink; // Open the mailto link to initiate an email client.
+
+            form.reset(); // Reset the form fields to their default state after submission.
         });
-    });
-});
-
-// Function to initialize and load user-specific data on page load
-document.addEventListener('DOMContentLoaded', async () => {
-    document.getElementById("logout-btn").value = "Logout-" + userData.Username; // Update logout button text with the username.
-
-    // Load private and public keys from localStorage
-    await loadPrivateKey(); 
-    loadPublicKey();
-
-    // Re-establish connection using the clientKeys stored in localStorage
-    if (Object.keys(clientKeys).length > 0) {
-        loadAvailableFriends(); // Load friends available for connection.
-        loadConReceiveFriends(); // Load received connection requests.
-        loadAccepetdFriends(); // Load accepted friends list.
-    }
-
-    // Handle notification when a connection request is sent
-    socket.on('email_send_notify', function (data) {
-        try {
-            clientKeys[data['sender']].status = "con_recv"; // Update the sender's status to connection received.
-            saveClientKeys(); // Save the updated client keys.
-            loadConReceiveFriends(); // Refresh the received connections list.
-            loadAvailableFriends(); // Refresh the available friends list.
-        } catch (error) {
-            console.error("Error message error:", error); // Log errors.
-        }
-    });
-
-    // Handle notification when a connection request reply is received
-    socket.on('email_reply_notify', function (data) {
-        try {
-            clientKeys[data['sender']].status = "con_reply_recv"; // Update the sender's status to reply received.
-            saveClientKeys(); // Save the updated client keys.
-            loadAvailableFriends(); // Refresh the available friends list.
-            loadConReceiveFriends(); // Refresh the received connections list.
-        } catch (error) {
-            console.error("Error message error:", error); // Log errors.
-        }
-    });
-
-    // Handle incoming messages
-    socket.on('message', async (data) => {
-        try {
-            let ul = document.getElementById("chat-msg"); // Select the chat messages list.
-            if (chatClient != data["sender"]) {
-                displaySelectFriendMessage(false); // Notify that a new sender's message is received.
-                let li = document.createElement("li");
-                li.appendChild(document.createTextNode(`Chat with - ${data["sender"]}`)); // Display sender's name.
-                li.classList.add("center_user"); // Add styling class.
-                ul.appendChild(li); // Append the message.
-                ul.scrollTop = ul.scrollHeight; // Scroll to the bottom of the chat.
-
-                chatClient = data["sender"]; // Update current chat client.
-                chatClientPK = clientKeys[data["sender"]].publicKey; // Retrieve sender's public key.
-            }
-
-            isCurrentUser = false; // Indicate the message is not from the current user.
-
-            console.log("Sender------------", data["sender"]); // Log sender information.
-            console.log("Sender Encrypted Message------------", data["message"]); // Log encrypted message.
-
-            let decryptedMessage = await decryptRSAOAEP(data["message"], privateKey); // Decrypt the received message.
-            console.log("Sender Decrypted Message------------", decryptedMessage); // Log decrypted message.
-
-            const li = document.createElement("li");
-            li.appendChild(document.createTextNode(`Friend: ${decryptedMessage}`)); // Display decrypted message.
-            li.classList.add("left_user"); // Add styling class.
-            ul.appendChild(li); // Append the message to the list.
-            ul.scrollTop = ul.scrollHeight; // Scroll to the bottom of the chat.
-        } catch (error) {
-            console.error("Error message error:", error); // Log errors.
-        }
     });
 });
