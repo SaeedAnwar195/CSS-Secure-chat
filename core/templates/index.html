@@ -1,66 +1,157 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- Meta tags for character set and viewport settings -->
     <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cryptogram - Dashboard</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
-    <style>
-        .user-info {
-            text-align: left;
-            margin: 20px 0;
-            padding: 15px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-        }
-
-        .user-info p {
-            margin: 10px 0;
-            color: #00838f;
-            font-size: 1.1em;
-        }
-
-        .user-info span {
-            font-weight: bold;
-            color: #006064;
-        }
-
-        .logout-btn {
-            background: #ff6b6b;
-            color: white;
-            margin-top: 20px;
-        }
-
-        .logout-btn:hover {
-            background: #ff5252;
-            transform: translateY(-2px);
-        }
-
-        .welcome-message {
-            color: #006064;
-            margin-bottom: 20px;
-            font-size: 1.2em;
-        }
-    </style>
+    
+    <!-- Link to external CSS file -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
+    
+    <!-- Google Fonts: Poppins -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Socket.IO for real-time communication -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    
+    <!-- Link to custom JavaScript file -->
+    <script src="{{ url_for('static', filename='index.js') }}"></script>
+    
+    <!-- Page title -->
+    <title>Cryptogram - Chat</title>
 </head>
-<body>
-    <header>
-        <h1>Cryptogram</h1>
-    </header>
-    <div class="container">
-        <div class="card">
-            <h2>Dashboard</h2>
-            <div class="welcome-message">
-                Welcome back, {{ userData.Username }}!
+<body onload="initiateUser()">
+    <div class="app-container">
+        <!-- Header Section -->
+        <header class="app-header">
+            <div class="header-content">
+                <h1>Cryptogram</h1>
+                <div class="user-info">
+                    <!-- Display the username -->
+                    <span class="username">{{ userData.Username }}</span>
+                    <!-- Logout button -->
+                    <form action="{{ url_for('cryptogram.login') }}" method="get">
+                        <input type="submit" class="form-submit btn logout-btn" value="Logout">
+                    </form>
+                </div>
             </div>
-            <div class="user-info">
-                <p>Username: <span>{{ userData.Username }}</span></p>
-                <p>Email: <span>{{ userData.Email }}</span></p>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Navigation Tabs for different sections -->
+            <nav class="tab-navigation">
+                <button class="tab-btn active" onclick="openTab(event, 'FriendList')">
+                    <span class="tab-icon">👥</span>
+                    Friends
+                </button>
+                <button class="tab-btn" onclick="openTab(event, 'PendingRequests')">
+                    <span class="tab-icon">🔔</span>
+                    Requests
+                </button>
+                <button class="tab-btn" onclick="openTab(event, 'OpenConnections')">
+                    <span class="tab-icon">💬</span>
+                    Chat
+                </button>
+            </nav>
+
+            <!-- Friends List Tab -->
+            <div id="FriendList" class="tab-content active">
+                <div class="content-grid">
+                    <!-- Friends List Section -->
+                    <div class="friends-section">
+                        <h2>Friends List</h2>
+                        <div class="friends-list" id="friends-list"></div>
+                    </div>
+                    <!-- Connection Request Section -->
+                    <div class="action-section" id="div_connect_request">
+                        <div class="action-card">
+                            <h3>Send Connection Request</h3>
+                            <p>Connect with other users to start chatting</p>
+                            <form id="email_request_form" class="connection-form"></form>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <form action="{{ url_for('cryptogram.login') }}" method="get">
-                <input type="submit" class="form-submit btn logout-btn" value="Logout">
-            </form>
-        </div>
+
+            <!-- Pending Requests Tab -->
+            <div id="PendingRequests" class="tab-content">
+                <div class="content-grid">
+                    <!-- Received Requests Section -->
+                    <div class="requests-section">
+                        <h2>Received Requests</h2>
+                        <div class="requests-list" id="received-list"></div>
+                    </div>
+                    <!-- Request Actions Section -->
+                    <div class="action-section" id="div_connect_request">
+                        <div class="action-card">
+                            <h3>Request Actions</h3>
+                            <p>Accept or decline connection requests</p>
+                            <form id="email_reply_form" class="connection-form"></form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Open Connections Tab -->
+            <div id="OpenConnections" class="tab-content">
+                <div class="chat-grid">
+                    <!-- Sidebar with Active Chats -->
+                    <div class="connections-sidebar">
+                        <h2>Active Chats</h2>
+                        <div class="connections-list" id="connections-list"></div>
+                    </div>
+                    <!-- Chat Area -->
+                    <div class="chat-area">
+                        <!-- Chat Messages -->
+                        <div class="chat-messages" id="chat-msg"></div>
+                        <div class="selected-friend" id="select-friend"></div>
+                        
+                        <!-- Input Area for sending messages -->
+                        <div class="chat-input-area">
+                            <div class="typing-indicator" id="typing-indicator"></div>
+                            <div class="input-group">
+                                <input type="text" id="message-input" placeholder="Type your message...">
+                                <button id="send" class="send-btn">Send</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Actions for Chat Area -->
+                        <div class="chat-actions">
+                            <button id="clearHistory" class="clear-btn">Clear Chat History</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
     </div>
+
+    <!-- JavaScript to manage tabs and initialize user -->
+    <script>
+        // User data passed from the backend
+        var userData = {{ userData | tojson }};
+        console.log('User data username =>', userData.Username);
+        console.log('User data email =>', userData.Email);
+
+        // Function to switch between tabs
+        function openTab(evt, tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            document.getElementById(tabName).classList.add('active');
+            evt.currentTarget.classList.add('active');
+        }
+
+        // Auto-click on the first tab to initialize the view
+        document.addEventListener("DOMContentLoaded", function() {
+            document.querySelector('.tab-btn').click();
+        });
+    </script>
 </body>
 </html>
