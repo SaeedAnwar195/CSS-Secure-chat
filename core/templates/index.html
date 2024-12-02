@@ -1,156 +1,102 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- Meta tags for character set and viewport settings -->
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
-    <!-- Link to external CSS file -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
-    
-    <!-- Google Fonts: Poppins -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
-    
-    <!-- Socket.IO for real-time communication -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-    
-    <!-- Link to custom JavaScript file -->
-    <script src="{{ url_for('static', filename='index.js') }}"></script>
-    
-    <!-- Page title -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js" integrity="sha512-q/dWJ3kcmjBLU4Qc47E4A9kTB4m3wuTY7vkFJDTZKjTs8jhyGQnaUrxa0Ytd0ssMZhbNua9hE+E7Qv1j+DyZwA==" crossorigin="anonymous"></script>
+    <script src="{{ url_for('static', filename='js/index.js') }}"></script>
     <title>Cryptogram - Chat</title>
 </head>
 <body onload="initiateUser()">
-    <div class="app-container">
-        <!-- Header Section -->
-        <header class="app-header">
-            <div class="header-content">
-                <h1>Cryptogram</h1>
-                <div class="user-info">
-                    <!-- Display the username -->
-                    <span class="username">{{ userData.Username }}</span>
-                    <!-- Logout button -->
-                    <form action="{{ url_for('cryptogram.login') }}" method="get">
-                        <input type="submit" class="form-submit btn logout-btn" value="Logout">
-                    </form>
+    <div class="chat-container">
+        <!-- Header -->
+        <div class="chat-header">
+            <h3 id="chat_header_text">Cryptogram</h3>
+            <button id="logout-btn">Logout</button>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="tab">
+            <button class="tablinks" onclick="openTab(event, 'FriendList')" id="defaultOpen">Friend List</button>
+            <button class="tablinks" onclick="openTab(event, 'PendingRequests')">Pending Requests</button>
+            <button class="tablinks" onclick="openTab(event, 'OpenConnections')">Open Connections</button>
+        </div>
+
+        <!-- Friend List Tab -->
+        <div id="FriendList" class="tabcontent">
+            <div class="flex-container">
+                <div class="friends-list-container">
+                    <h3>Friends</h3>
+                    <ul id="friends-list"></ul>
+                </div>
+                <div id="div_connect_request">
+                    <p>Cryptogram: Send connection request to join for the chat.</p>
+                    <form method="POST" id="email_request_form" action=""></form>
                 </div>
             </div>
-        </header>
+        </div>
 
-        <!-- Main Content Area -->
-        <main class="main-content">
-            <!-- Navigation Tabs for different sections -->
-            <nav class="tab-navigation">
-                <button class="tab-btn active" onclick="openTab(event, 'FriendList')">
-                    <span class="tab-icon">👥</span>
-                    Friends
-                </button>
-                <button class="tab-btn" onclick="openTab(event, 'PendingRequests')">
-                    <span class="tab-icon">🔔</span>
-                    Requests
-                </button>
-                <button class="tab-btn" onclick="openTab(event, 'OpenConnections')">
-                    <span class="tab-icon">💬</span>
-                    Chat
-                </button>
-            </nav>
-
-            <!-- Friends List Tab -->
-            <div id="FriendList" class="tab-content active">
-                <div class="content-grid">
-                    <!-- Friends List Section -->
-                    <div class="friends-section">
-                        <h2>Friends List</h2>
-                        <div class="friends-list" id="friends-list"></div>
-                    </div>
-                    <!-- Connection Request Section -->
-                    <div class="action-section" id="div_connect_request">
-                        <div class="action-card">
-                            <h3>Send Connection Request</h3>
-                            <p>Connect with other users to start chatting</p>
-                            <form id="email_request_form" class="connection-form"></form>
-                        </div>
-                    </div>
+        <!-- Pending Requests Tab -->
+        <div id="PendingRequests" class="tabcontent">
+            <div class="flex-container">
+                <div class="friends-list-container">
+                    <h3>Received Requests</h3>
+                    <ul id="received-list"></ul>
+                </div>
+                <div id="div_connect_request">
+                    <p>Cryptogram: Accept the connection request to chat.</p>
+                    <form method="POST" id="email_reply_form" action=""></form>
                 </div>
             </div>
+        </div>
 
-            <!-- Pending Requests Tab -->
-            <div id="PendingRequests" class="tab-content">
-                <div class="content-grid">
-                    <!-- Received Requests Section -->
-                    <div class="requests-section">
-                        <h2>Received Requests</h2>
-                        <div class="requests-list" id="received-list"></div>
+        <!-- Open Connections Tab -->
+        <div id="OpenConnections" class="tabcontent">
+            <div class="flex-container">
+                <div class="friends-list-container">
+                    <ul id="connections-list"></ul>
+                </div>
+                <div class="online-chat-container">
+                    <ul id="chat-msg"></ul>
+                    <div id="select-friend"></div>
+                    <div class="typing-indicator" id="typing-indicator"></div>
+                    <div class="chat-input">
+                        <input type="text" id="message-input" placeholder="Type a message..." aria-label="Message input">
+                        <button id="send">Send</button>
                     </div>
-                    <!-- Request Actions Section -->
-                    <div class="action-section" id="div_connect_request">
-                        <div class="action-card">
-                            <h3>Request Actions</h3>
-                            <p>Accept or decline connection requests</p>
-                            <form id="email_reply_form" class="connection-form"></form>
-                        </div>
+                    <div class="clearHistoryDiv">
+                        <button id="clearHistory" class="clearHistory">Clear History</button>
                     </div>
                 </div>
             </div>
-
-            <!-- Open Connections Tab -->
-            <div id="OpenConnections" class="tab-content">
-                <div class="chat-grid">
-                    <!-- Sidebar with Active Chats -->
-                    <div class="connections-sidebar">
-                        <h2>Active Chats</h2>
-                        <div class="connections-list" id="connections-list"></div>
-                    </div>
-                    <!-- Chat Area -->
-                    <div class="chat-area">
-                        <!-- Chat Messages -->
-                        <div class="chat-messages" id="chat-msg"></div>
-                        <div class="selected-friend" id="select-friend"></div>
-                        
-                        <!-- Input Area for sending messages -->
-                        <div class="chat-input-area">
-                            <div class="typing-indicator" id="typing-indicator"></div>
-                            <div class="input-group">
-                                <input type="text" id="message-input" placeholder="Type your message...">
-                                <button id="send" class="send-btn">Send</button>
-                            </div>
-                        </div>
-                        
-                        <!-- Actions for Chat Area -->
-                        <div class="chat-actions">
-                            <button id="clearHistory" class="clear-btn">Clear Chat History</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </main>
+        </div>
     </div>
 
-    <!-- JavaScript to manage tabs and initialize user -->
     <script>
-        // User data passed from the backend
         var userData = {{ userData | tojson }};
-        console.log('User data username =>', userData.Username);
-        console.log('User data email =>', userData.Email);
+        console.log('User data username -------', userData.Username);
+        console.log('User data email -------', userData.Email);
 
-        // Function to switch between tabs
         function openTab(evt, tabName) {
-            document.querySelectorAll('.tab-content').forEach(tab => {
-                tab.classList.remove('active');
-            });
-
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-
-            document.getElementById(tabName).classList.add('active');
-            evt.currentTarget.classList.add('active');
+            var i, tabcontent, tablinks;
+            tabcontent = document.getElementsByClassName("tabcontent");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+            }
+            tablinks = document.getElementsByClassName("tablinks");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+            }
+            document.getElementById(tabName).style.display = "block";
+            evt.currentTarget.className += " active";
         }
 
-        // Auto-click on the first tab to initialize the view
+        // Open Friend List tab by default
         document.addEventListener("DOMContentLoaded", function() {
-            document.querySelector('.tab-btn').click();
+            document.getElementById("defaultOpen").click();
         });
     </script>
 </body>

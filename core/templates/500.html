@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cryptogram - Server Error</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/errors.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="error-container">
+        <div class="error-card">
+            <div class="error-code">500</div>
+            <h1>Server Error</h1>
+            <p>Something went wrong on our end. Please try again later.</p>
+            <div class="error-actions">
+                <a href="{{ url_for('cryptogram.index') }}" class="primary-btn">Go to Dashboard</a>
+                <a href="{{ url_for('cryptogram.login') }}" class="secondary-btn">Back to Login</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
