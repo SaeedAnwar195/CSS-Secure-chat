@@ -1,0 +1,125 @@
+/* Error Pages Styling */
+body {
+    font-family: 'Poppins', sans-serif;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #00b4db 0%, #0083b0 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.error-container {
+    width: 100%;
+    max-width: 500px;
+    padding: 20px;
+}
+
+.error-card {
+    background: white;
+    border-radius: 15px;
+    padding: 40px;
+    text-align: center;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    animation: slideUp 0.4s ease-out;
+}
+
+.error-code {
+    font-size: 96px;
+    font-weight: 700;
+    color: #00b4db;
+    line-height: 1;
+    margin-bottom: 20px;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.error-card h1 {
+    color: #333;
+    font-size: 28px;
+    margin: 0 0 15px 0;
+    font-weight: 600;
+}
+
+.error-card p {
+    color: #666;
+    font-size: 16px;
+    margin: 0 0 30px 0;
+    line-height: 1.6;
+}
+
+.error-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+}
+
+.primary-btn, .secondary-btn {
+    padding: 12px 24px;
+    border-radius: 25px;
+    font-size: 16px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.primary-btn {
+    background: linear-gradient(135deg, #00b4db 0%, #0083b0 100%);
+    color: white;
+}
+
+.primary-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 180, 219, 0.3);
+}
+
+.secondary-btn {
+    background: #f8f9fa;
+    color: #00b4db;
+    border: 2px solid #00b4db;
+}
+
+.secondary-btn:hover {
+    background: #00b4db;
+    color: white;
+    transform: translateY(-2px);
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive Design */
+@media (max-width: 480px) {
+    .error-container {
+        padding: 15px;
+    }
+
+    .error-card {
+        padding: 30px 20px;
+    }
+
+    .error-code {
+        font-size: 72px;
+    }
+
+    .error-card h1 {
+        font-size: 24px;
+    }
+
+    .error-actions {
+        flex-direction: column;
+    }
+
+    .primary-btn, .secondary-btn {
+        width: 100%;
+        text-align: center;
+    }
+}
