@@ -361,6 +361,7 @@ def internal_error(error):
     db.session.rollback()
     return render_template('errors/500.html'), 500
 
+
 @bp.route('/send-key-email', methods=['POST'])
 def send_key_email():
     data = request.json
